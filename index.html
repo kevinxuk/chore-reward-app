@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家务零花钱打卡</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 480px; margin: 0 auto; background: #f5f5f5; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white; padding: 20px 16px; text-align: center; }
+        .header h1 { font-size: 22px; margin-bottom: 4px; }
+        .header .date { font-size: 13px; opacity: 0.9; }
+        .role-switch { display: flex; margin: 16px; background: white; border-radius: 12px; padding: 4px; }
+        .role-btn { flex: 1; padding: 12px; border: none; background: transparent; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+        .role-btn.active { background: linear-gradient(135deg, #2196F3, #1976D2); color: white; }
+        .page { display: none; padding: 16px; }
+        .page.active { display: block; }
+        .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .card-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
+        .stats-row { display: flex; gap: 12px; margin-bottom: 16px; }
+        .stat-card { flex: 1; background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .stat-value { font-size: 24px; font-weight: bold; color: #4CAF50; }
+        .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
+        .task-group { margin-bottom: 16px; }
+        .group-header { font-size: 14px; font-weight: 600; color: #666; margin-bottom: 8px; }
+        .task-item { display: flex; align-items: center; padding: 12px; background: white; border-radius: 8px; margin-bottom: 8px; cursor: pointer; }
+        .task-item.checked { background: #E8F5E9; }
+        .task-item.disabled { opacity: 0.5; cursor: not-allowed; }
+        .task-check { width: 24px; height: 24px; border: 2px solid #ccc; border-radius: 6px; margin-right: 12px; display: flex; align-items: center; justify-content: center; }
+        .task-item.checked .task-check { background: #4CAF50; border-color: #4CAF50; }
+        .task-check::after { content: '✓'; color: white; font-size: 14px; font-weight: bold; }
+        .task-icon { font-size: 20px; margin-right: 12px; }
+        .task-name { flex: 1; font-size: 14px; color: #333; }
+        .task-item.checked .task-name { text-decoration: line-through; color: #999; }
+        .task-amount { font-size: 14px; font-weight: 600; color: #4CAF50; margin-left: 8px; }
+        .task-weekend { font-size: 12px; color: #999; margin-left: 4px; }
+        .login-form { background: white; border-radius: 12px; padding: 24px; margin: 16px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
+        .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: linear-gradient(135deg, #2196F3, #1976D2); color: white; }
+        .btn-success { background: linear-gradient(135deg, #4CAF50, #388E3C); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #f44336, #d32f2f); color: white; }
+        .approval-item { background: white; border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+        .approval-item.pending { background: #FFF3E0; }
+        .approval-info { flex: 1; }
+        .approval-name { font-size: 14px; font-weight: 600; }
+        .approval-date { font-size: 12px; color: #999; }
+        .approval-amount { font-size: 16px; font-weight: bold; color: #4CAF50; margin: 0 12px; }
+        .settings-item { display: flex; align-items: center; padding: 16px; background: white; border-radius: 8px; margin-bottom: 8px; }
+        .settings-icon { font-size: 24px; margin-right: 12px; }
+        .settings-text { flex: 1; font-size: 14px; }
+        .settings-arrow { color: #999; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: white; border-radius: 16px; padding: 24px; width: 90%; max-width: 360px; }
+        .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+        .empty-state { text-align: center; padding: 40px 20px; color: #999; }
+        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+        .history-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .history-table th, .history-table td { padding: 6px 2px; text-align: center; border: 1px solid #eee; }
+        .history-table th { background: #f5f5f5; }
+        .history-table td.task-name { text-align: left; padding-left: 4px; font-size: 10px; }
+        .history-table .checked { color: #4CAF50; font-weight: bold; }
+        .history-table .not-checked { color: #ccc; }
+        .history-table .amount { color: #4CAF50; font-weight: 600; }
+        .month-selector { display: flex; gap: 8px; margin-bottom: 16px; }
+        .month-selector select { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        .month-selector button { padding: 10px 16px; border: none; background: #2196F3; color: white; border-radius: 8px; cursor: pointer; }
+        .export-btn { background: #2196F3; color: white; padding: 8px 16px; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; }
+        .device-info { background: #E8F5E9; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #2E7D32; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧹 家务零花钱打卡</h1>
+            <div class="date" id="currentDate"></div>
+        </div>
+        
+        <div class="role-switch">
+            <button class="role-btn active" onclick="switchRole('child')">👦 孩子端</button>
+            <button class="role-btn" onclick="switchRole('parent')">👨 家长端</button>
+        </div>
+        
+        <div id="childPage" class="page active">
+            <div class="device-info">📱 本地存储 | 数据保存在当前设备浏览器中</div>
+            
+            <div class="stats-row">
+                <div class="stat-card">
+                    <div class="stat-value" id="todayAmount">¥0.0</div>
+                    <div class="stat-label">今日收入</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="monthAmount">¥0.0</div>
+                    <div class="stat-label">本月累计</div>
+                </div>
+            </div>
+            
+            <div id="taskList"></div>
+        </div>
+        
+        <div id="parentPage" class="page">
+            <div id="loginSection">
+                <div class="login-form">
+                    <div class="form-group">
+                        <label>家长密码</label>
+                        <input type="password" id="parentPassword" placeholder="请输入密码">
+                    </div>
+                    <button class="btn btn-primary" onclick="login()">登录</button>
+                </div>
+            </div>
+            
+            <div id="parentPanel" style="display:none;">
+                <div class="device-info">👨 家长模式 | 可审核记录、查看历史</div>
+                
+                <div class="card">
+                    <div class="card-title">👦 孩子信息</div>
+                    <div id="childInfo"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">📋 今日待审核 <span id="pendingCount" style="font-size:12px;color:#999;font-weight:normal;"></span></div>
+                    <div id="approvalList"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">📊 本月统计</div>
+                    <div id="monthStats"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">📅 历史记录 <button class="export-btn" onclick="exportHistory()" style="margin-left:8px;">📥 导出</button></div>
+                    <div class="month-selector">
+                        <select id="historyYear" onchange="loadHistory()"></select>
+                        <select id="historyMonth" onchange="loadHistory()"></select>
+                        <button onclick="loadHistory()">查询</button>
+                    </div>
+                    <div id="historyTable" style="overflow-x:auto;"></div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-title">⚙️ 设置</div>
+                    <div class="settings-item" onclick="showSettings()">
+                        <span class="settings-icon">👤</span>
+                        <span class="settings-text">修改孩子信息</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                    <div class="settings-item" onclick="changePassword()">
+                        <span class="settings-icon">🔒</span>
+                        <span class="settings-text">修改密码</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                    <div class="settings-item" onclick="clearData()">
+                        <span class="settings-icon">🗑️</span>
+                        <span class="settings-text">清除所有数据</span>
+                        <span class="settings-arrow">›</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-title">修改孩子信息</div>
+            <div class="form-group"><label>孩子姓名</label><input type="text" id="childName" placeholder="输入姓名"></div>
+            <div class="form-group"><label>班级</label><input type="text" id="childClass" placeholder="输入班级"></div>
+            <button class="btn btn-success" onclick="saveSettings()">保存</button>
+            <button class="btn btn-danger" style="margin-top:8px" onclick="closeModal()">取消</button>
+        </div>
+    </div>
+    
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <div class="modal-title">修改密码</div>
+            <div class="form-group"><label>新密码</label><input type="password" id="newPassword" placeholder="输入新密码"></div>
+            <div class="form-group"><label>确认密码</label><input type="password" id="confirmPassword" placeholder="再次输入密码"></div>
+            <button class="btn btn-success" onclick="savePassword()">保存</button>
+            <button class="btn btn-danger" style="margin-top:8px" onclick="closeModal()">取消</button>
+        </div>
+    </div>
+    
+    <script>
+        const TASKS = [
+            { group: '🌅 晨间', tasks: [
+                { name: '按时起床、叠好被子', amount: 1.0, icon: '⏰', weekend: false },
+                { name: '整理床铺', amount: 0.5, icon: '🛏️', weekend: false },
+                { name: '吃早餐（不催促）', amount: 0.5, icon: '🍳', weekend: false },
+                { name: '准备当天上学用品', amount: 0.5, icon: '🎒', weekend: false },
+            ]},
+            { group: '🏠 家务', tasks: [
+                { name: '摆碗筷、收拾餐桌', amount: 1.0, icon: '🍽️', weekend: false },
+                { name: '扫地/拖地（自己房间）', amount: 1.0, icon: '🧹', weekend: false },
+                { name: '倒垃圾（分类）', amount: 0.5, icon: '🗑️', weekend: false },
+                { name: '擦桌子', amount: 0.5, icon: '🧽', weekend: false },
+                { name: '整理玩具/书籍', amount: 0.5, icon: '🧸', weekend: false },
+                { name: '周末：洗菜/择菜/洗袜子等', amount: 2.0, icon: '🧺', weekend: true },
+            ]},
+            { group: '📚 学习', tasks: [
+                { name: '按时完成作业（无催促）', amount: 2.0, icon: '📝', weekend: false },
+                { name: '主动复习/预习', amount: 1.0, icon: '📖', weekend: false },
+                { name: '课外阅读30分钟', amount: 1.0, icon: '📚', weekend: false },
+                { name: '练字/书法练习', amount: 1.0, icon: '✍️', weekend: false },
+                { name: '完成额外练习题', amount: 1.0, icon: '📐', weekend: false },
+                { name: '整理书包/学习资料', amount: 0.5, icon: '📁', weekend: false },
+                { name: '背单词/古诗词（10个）', amount: 0.5, icon: '🔤', weekend: false },
+            ]},
+            { group: '🏃 运动', tasks: [
+                { name: '跳绳100下', amount: 1.0, icon: '⏭️', weekend: false },
+                { name: '跑步/慢跑800米', amount: 1.5, icon: '🏃', weekend: false },
+                { name: '仰卧起坐30个', amount: 1.0, icon: '💪', weekend: false },
+                { name: '坐位体前屈练习', amount: 0.5, icon: '🤸', weekend: false },
+                { name: '立定跳远练习', amount: 0.5, icon: '🦘', weekend: false },
+                { name: '开合跳/高抬腿（5分钟）', amount: 1.0, icon: '🔥', weekend: false },
+                { name: '球类运动（篮球/足球/乒乓球等）', amount: 1.5, icon: '⚽', weekend: false },
+            ]}
+        ];
+        
+        let data = { profile: { name: '小朋友', class: '', password: '123456' }, checks: {}, approvals: [] };
+        let isParentLoggedIn = false;
+        
+        function init() {
+            loadData(); updateDate(); renderTasks(); updateStats(); checkParentLogin(); initMonthSelectors(); loadHistory();
+        }
+        
+        function loadData() {
+            const saved = localStorage.getItem('choreData');
+            if (saved) data = JSON.parse(saved);
+        }
+        
+        function saveData() { localStorage.setItem('choreData', JSON.stringify(data)); }
+        
+        function updateDate() {
+            const now = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+            document.getElementById('currentDate').textContent = now.toLocaleDateString('zh-CN', options);
+        }
+        
+        function switchRole(role) {
+            document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            if (role === 'child') {
+                document.querySelector('.role-btn:nth-child(1)').classList.add('active');
+                document.getElementById('childPage').classList.add('active');
+            } else {
+                document.querySelector('.role-btn:nth-child(2)').classList.add('active');
+                document.getElementById('parentPage').classList.add('active');
+                renderParentPanel();
+            }
+        }
+        
+        function renderTasks() {
+            const container = document.getElementById('taskList');
+            const today = getTodayKey();
+            const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
+            
+            container.innerHTML = TASKS.map(group => {
+                const tasksHtml = group.tasks.map(task => {
+                    const taskId = `${group.group}-${task.name}`;
+                    const isChecked = data.checks[taskId] === today;
+                    const isWeekendTask = task.weekend && !isWeekendDay(today);
+                    return `<div class="task-item ${isChecked ? 'checked' : ''} ${isWeekendTask ? 'disabled' : ''}" onclick="${isWeekendTask ? '' : `toggleTask('${taskId}', '${task.name}', ${task.amount})`}">
+                        <div class="task-check"></div><span class="task-icon">${task.icon}</span><span class="task-name">${task.name}</span>
+                        <span class="task-amount">+¥${task.amount.toFixed(1)}</span>${task.weekend ? '<span class="task-weekend">🌙</span>' : ''}
+                    </div>`;
+                }).join('');
+                return `<div class="task-group"><div class="group-header">${group.group}</div>${tasksHtml}</div>`;
+            }).join('');
+        }
+        
+        function toggleTask(taskId, taskName, amount) {
+            const today = getTodayKey();
+            if (data.checks[taskId] === today) delete data.checks[taskId];
+            else data.checks[taskId] = today;
+            saveData(); renderTasks(); updateStats(); addApproval(taskName, amount, today);
+        }
+        
+        function addApproval(taskName, amount, date) {
+            data.approvals.unshift({ id: Date.now(), task: taskName, amount: amount, date: date, status: 'pending', timestamp: new Date().toISOString() });
+            saveData();
+        }
+        
+        function updateStats() {
+            const today = getTodayKey();
+            const todayChecks = Object.entries(data.checks).filter(([_, date]) => date === today).reduce((sum, [taskId]) => sum + (findTask(taskId) ? findTask(taskId).amount : 0), 0);
+            const now = new Date();
+            const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const monthChecks = Object.entries(data.checks).filter(([_, date]) => date.startsWith(monthPrefix)).reduce((sum, [taskId]) => sum + (findTask(taskId) ? findTask(taskId).amount : 0), 0);
+            document.getElementById('todayAmount').textContent = `¥${todayChecks.toFixed(1)}`;
+            document.getElementById('monthAmount').textContent = `¥${monthChecks.toFixed(1)}`;
+        }
+        
+        function findTask(taskId) {
+            for (const group of TASKS) for (const task of group.tasks) if (`${group.group}-${task.name}` === taskId) return task;
+            return null;
+        }
+        
+        function getTodayKey() { return new Date().toISOString().split('T')[0]; }
+        function isWeekendDay(dateKey) { const d = new Date(dateKey); return d.getDay() === 0 || d.getDay() === 6; }
+        
+        function initMonthSelectors() {
+            const yearSelect = document.getElementById('historyYear');
+            const monthSelect = document.getElementById('historyMonth');
+            const currentYear = new Date().getFullYear();
+            for (let year = currentYear - 1; year <= currentYear + 1; year++) {
+                const option = document.createElement('option');
+                option.value = year; option.textContent = year + '年';
+                yearSelect.appendChild(option);
+            }
+            yearSelect.value = currentYear;
+            for (let month = 1; month <= 12; month++) {
+                const option = document.createElement('option');
+                option.value = month; option.textContent = month + '月';
+                monthSelect.appendChild(option);
+            }
+            monthSelect.value = new Date().getMonth() + 1;
+        }
+        
+        function loadHistory() {
+            const year = parseInt(document.getElementById('historyYear').value);
+            const month = parseInt(document.getElementById('historyMonth').value);
+            const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+            const monthChecks = Object.entries(data.checks).filter(([_, date]) => date.startsWith(monthPrefix));
+            const taskMap = {};
+            TASKS.forEach(group => group.tasks.forEach(task => { taskMap[`${group.group}-${task.name}`] = { name: task.name, icon: task.icon, amount: task.amount }; }));
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const dates = Array.from({ length: daysInMonth }, (_, i) => ({ key: `${monthPrefix}-${String(i+1).padStart(2, '0')}`, day: i+1 }));
+            
+            let html = '<table class="history-table"><thead><tr><th style="width:25%">任务</th>';
+            dates.forEach(d => { const dayOfWeek = new Date(d.key).getDay(); const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; html += `<th style="${isWeekend ? 'background:#FFF3E0' : ''}">${d.day}<br><span style="font-size:9px">${['日','一','二','三','四','五','六'][dayOfWeek]}</span></th>`; });
+            html += '<th style="background:#E8F5E9">合计</th></tr></thead><tbody>';
+            Object.entries(taskMap).forEach(([taskId, task]) => {
+                html += `<tr><td class="task-name">${task.icon} ${task.name}</td>`;
+                let total = 0;
+                dates.forEach(d => { const isChecked = monthChecks.some(([tid, date]) => tid === taskId && date === d.key); if (isChecked) { html += '<td class="checked">✓</td>'; total += task.amount; } else { html += '<td class="not-checked">-</td>'; } });
+                html += `<td class="amount">¥${total.toFixed(1)}</td></tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('historyTable').innerHTML = html;
+        }
+        
+        function exportHistory() {
+            const year = parseInt(document.getElementById('historyYear').value);
+            const month = parseInt(document.getElementById('historyMonth').value);
+            const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
+            const monthChecks = Object.entries(data.checks).filter(([_, date]) => date.startsWith(monthPrefix));
+            let csv = '任务,金额,';
+            const daysInMonth = new Date(year, month, 0).getDate();
+            for (let day = 1; day <= daysInMonth; day++) csv += `${monthPrefix}-${String(day).padStart(2, '0')},`;
+            csv += '合计\n';
+            TASKS.forEach(group => group.tasks.forEach(task => {
+                const taskId = `${group.group}-${task.name}`;
+                csv += `"${task.name}",${task.amount},`;
+                let total = 0;
+                for (let day = 1; day <= daysInMonth; day++) {
+                    const dateKey = `${monthPrefix}-${String(day).padStart(2, '0')}`;
+                    const isChecked = monthChecks.some(([tid, date]) => tid === taskId && date === dateKey);
+                    csv += (isChecked ? '✓' : '-') + ',';
+                    if (isChecked) total += task.amount;
+                }
+                csv += `¥${total.toFixed(1)}\n`;
+            }));
+            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `家务打卡_${year}年${month}月.csv`;
+            link.click();
+        }
+        
+        function login() {
+            const password = document.getElementById('parentPassword').value;
+            if (password === data.profile.password) {
+                sessionStorage.setItem('parentLoggedIn', 'true');
+                isParentLoggedIn = true;
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('parentPanel').style.display = 'block';
+                renderParentPanel();
+            } else alert('密码错误');
+        }
+        
+        function checkParentLogin() {
+            if (sessionStorage.getItem('parentLoggedIn') === 'true') {
+                isParentLoggedIn = true;
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('parentPanel').style.display = 'block';
+            }
+        }
+        
+        function renderParentPanel() {
+            document.getElementById('childInfo').innerHTML = `<div style="font-size:18px;font-weight:600;">${data.profile.name}</div><div style="font-size:14px;color:#666;">${data.profile.class || '未设置班级'}</div>`;
+            const today = getTodayKey();
+            const todayApprovals = data.approvals.filter(a => a.date === today && a.status === 'pending');
+            document.getElementById('pendingCount').textContent = `(待审核 ${todayApprovals.length} 条)`;
+            if (todayApprovals.length === 0) {
+                document.getElementById('approvalList').innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>今日暂无待审核记录</div></div>';
+            } else {
+                document.getElementById('approvalList').innerHTML = todayApprovals.map(a => `<div class="approval-item pending"><div class="approval-info"><div class="approval-name">${a.task}</div><div class="approval-date">${formatTime(a.timestamp)}</div></div><div class="approval-amount">+¥${a.amount.toFixed(1)}</div><button class="btn btn-success" style="width:auto;padding:8px 16px;margin-left:8px;" onclick="approveTask(${a.id})">审核</button></div>`).join('');
+            }
+            const monthPrefix = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+            const monthApprovals = data.approvals.filter(a => a.date.startsWith(monthPrefix));
+            const totalAmount = monthApprovals.reduce((sum, a) => sum + a.amount, 0);
+            const approvedAmount = monthApprovals.filter(a => a.status === 'approved').reduce((sum, a) => sum + a.amount, 0);
+            document.getElementById('monthStats').innerHTML = `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><span>本月累计收入</span><span style="font-weight:600;color:#4CAF50;">¥${totalAmount.toFixed(1)}</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><span>已审核金额</span><span style="font-weight:600;color:#2196F3;">¥${approvedAmount.toFixed(1)}</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;"><span>审核记录数</span><span style="font-weight:600;">${monthApprovals.length}条</span></div>`;
+        }
+        
+        function approveTask(id) { const approval = data.approvals.find(a => a.id === id); if (approval) { approval.status = 'approved'; saveData(); renderParentPanel(); } }
+        function showSettings() { document.getElementById('childName').value = data.profile.name; document.getElementById('childClass').value = data.profile.class; document.getElementById('settingsModal').classList.add('show'); }
+        function saveSettings() { data.profile.name = document.getElementById('childName').value || '小朋友'; data.profile.class = document.getElementById('childClass').value; saveData(); closeModal(); renderParentPanel(); }
+        function changePassword() { document.getElementById('passwordModal').classList.add('show'); }
+        function savePassword() { const newPwd = document.getElementById('newPassword').value; const confirmPwd = document.getElementById('confirmPassword').value; if (!newPwd) { alert('请输入新密码'); return; } if (newPwd !== confirmPwd) { alert('两次密码不一致'); return; } data.profile.password = newPwd; saveData(); closeModal(); alert('密码已修改'); }
+        function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('show')); document.getElementById('newPassword').value = ''; document.getElementById('confirmPassword').value = ''; }
+        function clearData() { if (confirm('确定要清除所有数据吗？此操作不可恢复！')) { data = { profile: { name: '小朋友', class: '', password: '123456' }, checks: {}, approvals: [] }; saveData(); renderParentPanel(); alert('数据已清除'); } }
+        function formatTime(isoString) { const date = new Date(isoString); return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`; }
+        
+        window.onload = init;
+    </script>
+</body>
+</html>
