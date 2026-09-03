@@ -1,421 +1,749 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>家务零花钱打卡</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
-        .container { max-width: 480px; margin: 0 auto; background: #f5f5f5; min-height: 100vh; }
-        .header { background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%); color: white; padding: 20px 16px; text-align: center; }
-        .header h1 { font-size: 22px; margin-bottom: 4px; }
-        .header .date { font-size: 13px; opacity: 0.9; }
-        .role-switch { display: flex; margin: 16px; background: white; border-radius: 12px; padding: 4px; }
-        .role-btn { flex: 1; padding: 12px; border: none; background: transparent; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
-        .role-btn.active { background: linear-gradient(135deg, #2196F3, #1976D2); color: white; }
-        .page { display: none; padding: 16px; }
-        .page.active { display: block; }
-        .card { background: white; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .card-title { font-size: 15px; font-weight: 600; margin-bottom: 12px; }
-        .stats-row { display: flex; gap: 12px; margin-bottom: 16px; }
-        .stat-card { flex: 1; background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .stat-value { font-size: 24px; font-weight: bold; color: #4CAF50; }
-        .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
-        .task-group { margin-bottom: 16px; }
-        .group-header { font-size: 14px; font-weight: 600; color: #666; margin-bottom: 8px; }
-        .task-item { display: flex; align-items: center; padding: 12px; background: white; border-radius: 8px; margin-bottom: 8px; cursor: pointer; }
-        .task-item.checked { background: #E8F5E9; }
-        .task-item.disabled { opacity: 0.5; cursor: not-allowed; }
-        .task-check { width: 24px; height: 24px; border: 2px solid #ccc; border-radius: 6px; margin-right: 12px; display: flex; align-items: center; justify-content: center; }
-        .task-item.checked .task-check { background: #4CAF50; border-color: #4CAF50; }
-        .task-check::after { content: '✓'; color: white; font-size: 14px; font-weight: bold; }
-        .task-icon { font-size: 20px; margin-right: 12px; }
-        .task-name { flex: 1; font-size: 14px; color: #333; }
-        .task-item.checked .task-name { text-decoration: line-through; color: #999; }
-        .task-amount { font-size: 14px; font-weight: 600; color: #4CAF50; margin-left: 8px; }
-        .task-weekend { font-size: 12px; color: #999; margin-left: 4px; }
-        .login-form { background: white; border-radius: 12px; padding: 24px; margin: 16px; }
-        .form-group { margin-bottom: 16px; }
-        .form-group label { display: block; font-size: 14px; color: #666; margin-bottom: 8px; }
-        .form-group input { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-        .btn { width: 100%; padding: 14px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
-        .btn-primary { background: linear-gradient(135deg, #2196F3, #1976D2); color: white; }
-        .btn-success { background: linear-gradient(135deg, #4CAF50, #388E3C); color: white; }
-        .btn-danger { background: linear-gradient(135deg, #f44336, #d32f2f); color: white; }
-        .approval-item { background: white; border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
-        .approval-item.pending { background: #FFF3E0; }
-        .approval-info { flex: 1; }
-        .approval-name { font-size: 14px; font-weight: 600; }
-        .approval-date { font-size: 12px; color: #999; }
-        .approval-amount { font-size: 16px; font-weight: bold; color: #4CAF50; margin: 0 12px; }
-        .settings-item { display: flex; align-items: center; padding: 16px; background: white; border-radius: 8px; margin-bottom: 8px; }
-        .settings-icon { font-size: 24px; margin-right: 12px; }
-        .settings-text { flex: 1; font-size: 14px; }
-        .settings-arrow { color: #999; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-        .modal.show { display: flex; }
-        .modal-content { background: white; border-radius: 16px; padding: 24px; width: 90%; max-width: 360px; }
-        .modal-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
-        .empty-state { text-align: center; padding: 40px 20px; color: #999; }
-        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
-        .history-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        .history-table th, .history-table td { padding: 6px 2px; text-align: center; border: 1px solid #eee; }
-        .history-table th { background: #f5f5f5; }
-        .history-table td.task-name { text-align: left; padding-left: 4px; font-size: 10px; }
-        .history-table .checked { color: #4CAF50; font-weight: bold; }
-        .history-table .not-checked { color: #ccc; }
-        .history-table .amount { color: #4CAF50; font-weight: 600; }
-        .month-selector { display: flex; gap: 8px; margin-bottom: 16px; }
-        .month-selector select { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
-        .month-selector button { padding: 10px 16px; border: none; background: #2196F3; color: white; border-radius: 8px; cursor: pointer; }
-        .export-btn { background: #2196F3; color: white; padding: 8px 16px; border: none; border-radius: 8px; font-size: 13px; cursor: pointer; }
-        .device-info { background: #E8F5E9; border-radius: 8px; padding: 12px; margin-bottom: 16px; font-size: 13px; color: #2E7D32; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>🌟 家务零花钱打卡</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#FFF9E6">
+<style>
+:root{
+  --c-morning:#FFF9E6; --c-chore:#E8F4FD; --c-study:#E8F8F5; --c-sport:#E8F8E8;
+  --c-weekend:#FFE8E8; --ink:#333; --ink2:#666; --red:#c0392b; --green:#1e8449;
+  --line:#ddd; --card:#fff; --bg:#F6F4EF; --accent:#F5A623; --blue:#2478b8;
+  --radius:12px; --shadow:0 1px 3px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:15px}
+body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;padding-bottom:70px}
+button{font-family:inherit;cursor:pointer}
+
+/* ===== 顶栏 ===== */
+header{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
+.hd-top{display:flex;align-items:center;gap:8px;padding:8px 12px;flex-wrap:wrap}
+.hd-title{font-size:1.05rem;font-weight:700}
+.hd-title .child{color:var(--blue);cursor:pointer;border-bottom:1px dashed var(--blue)}
+.hd-bal{margin-left:auto;display:flex;gap:10px;align-items:center;font-size:.85rem;white-space:nowrap}
+.hd-bal .game-sum{color:var(--green);font-weight:600}
+.total-chip{background:linear-gradient(135deg,#fff4e0,#ffe9cf);border:1.5px solid #f3d9b5;border-radius:10px;padding:4px 12px;text-align:right;line-height:1.25}
+.total-chip .tc-k{font-size:.68rem;color:#a06a1a;font-weight:600}
+.total-chip .tc-v{font-size:1.25rem;font-weight:800;color:var(--red)}
+.total-chip .tc-sub{font-size:.62rem;color:#b98a4d}
+.hd-nav{display:flex;align-items:center;gap:6px;padding:0 12px 8px}
+.views{display:flex;background:#eee;border-radius:8px;padding:2px;gap:2px}
+.views button{border:0;background:transparent;padding:5px 12px;border-radius:7px;font-size:.85rem;color:var(--ink2)}
+.views button.on{background:#fff;color:var(--ink);font-weight:700;box-shadow:var(--shadow)}
+.range{display:flex;align-items:center;gap:4px;margin-left:auto}
+.range button{border:1px solid var(--line);background:#fff;border-radius:8px;width:30px;height:30px;font-size:.9rem;line-height:1}
+.range .lbl{min-width:110px;text-align:center;font-weight:700;font-size:.9rem}
+.range .today-btn{width:auto;padding:0 10px;font-size:.78rem;color:var(--blue)}
+.hd-tools{display:flex;gap:6px;padding:0 12px 8px;flex-wrap:wrap}
+.hd-tools button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;font-size:.75rem;color:var(--ink2)}
+.hd-tools button:hover{border-color:var(--blue);color:var(--blue)}
+
+main{max-width:1200px;margin:0 auto;padding:12px}
+
+/* ===== 结算条 ===== */
+.summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.sum-card{flex:1;min-width:110px;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:10px 14px}
+.sum-card .k{font-size:.75rem;color:var(--ink2)}
+.sum-card .v{font-size:1.3rem;font-weight:800;margin-top:2px}
+.sum-card.income .v{color:var(--green)} .sum-card.expense .v{color:var(--accent)} .sum-card.balance .v{color:var(--red)}
+
+/* ===== 日视图 ===== */
+.day-head{display:flex;align-items:center;gap:12px;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:12px 16px;margin-bottom:12px}
+.day-head .d-info{flex:1}
+.day-head .d-date{font-size:1.1rem;font-weight:800}
+.day-head .d-sub{font-size:.78rem;color:var(--ink2);margin-top:2px}
+.progress-ring{position:relative;width:56px;height:56px;flex:none}
+.progress-ring svg{transform:rotate(-90deg)}
+.progress-ring .pr-txt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700}
+.day-income{flex:none;text-align:right;font-size:.8rem;color:var(--ink2)}
+.day-income b{display:block;font-size:1.35rem;color:var(--green)}
+.grp{margin-bottom:14px}
+.grp-title{font-size:.85rem;font-weight:700;padding:6px 10px;border-radius:8px 8px 0 0;display:flex;align-items:center;gap:6px}
+.grp-title .gt-sum{margin-left:auto;font-weight:600;font-size:.75rem;color:var(--ink2)}
+.grp-morning .grp-title{background:var(--c-morning)} .grp-chore .grp-title{background:var(--c-chore)}
+.grp-study .grp-title{background:var(--c-study)} .grp-sport .grp-title{background:var(--c-sport)}
+.task-list{background:var(--card);border:1px solid var(--line);border-top:0;border-radius:0 0 var(--radius) var(--radius);overflow:hidden}
+.task{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid #f0f0f0;cursor:pointer;user-select:none}
+.task:last-child{border-bottom:0}
+.task .ck{width:26px;height:26px;flex:none;border:2px solid #bbb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;transition:all .15s;background:#fff}
+.task.done .ck{background:var(--green);border-color:var(--green)}
+.task .nm{flex:1;font-size:.92rem}
+.task.done .nm{color:var(--ink2);text-decoration:line-through}
+.task .amt{font-size:.8rem;color:var(--ink2);white-space:nowrap}
+.task.done .amt{color:var(--green);font-weight:700}
+.task.off{opacity:.45;cursor:not-allowed}
+.task.off .ck{border-style:dashed}
+
+/* ===== 兑换/消费卡片 ===== */
+.spend-card{background:linear-gradient(135deg,#fff7ec,#ffefe0);border:1.5px solid #f3d9b5;border-radius:var(--radius);padding:12px 14px;margin-bottom:14px}
+.spend-card h3{font-size:.95rem;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.spend-card h3 .bal-hint{margin-left:auto;font-weight:400;font-size:.72rem;color:var(--ink2)}
+.game-hours{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.gh-btn{border:1.5px solid #e0b97c;background:#fff;border-radius:10px;padding:7px 0;flex:1;min-width:56px;text-align:center;font-size:.85rem;font-weight:600}
+.gh-btn small{display:block;font-weight:400;font-size:.68rem;color:var(--ink2)}
+.gh-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.gh-btn.on small{color:#fff8ea}
+.custom-game{display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:.8rem}
+.custom-game input{width:70px;border:1px solid #e0b97c;border-radius:8px;padding:6px;font-size:.85rem;text-align:center}
+.spend-actions{display:flex;gap:8px;flex-wrap:wrap}
+.spend-actions button{border:0;border-radius:10px;padding:9px 16px;font-size:.85rem;font-weight:700}
+.btn-redeem{background:var(--accent);color:#fff} .btn-redeem:disabled{background:#e5d5bd;color:#fff;cursor:not-allowed}
+.btn-add-exp{background:#fff;border:1.5px solid #e0b97c;color:#a06a1a}
+.day-expenses{margin-top:10px;border-top:1px dashed #e0b97c;padding-top:8px}
+.exp-item{display:flex;align-items:center;gap:8px;padding:6px 2px;font-size:.85rem}
+.exp-item .ex-nm{flex:1}
+.exp-item .ex-amt{color:var(--accent);font-weight:700}
+.exp-item .ex-del{border:0;background:transparent;color:#c9a06a;font-size:.95rem;padding:2px 6px}
+.midweek-note{background:#eef4fb;border:1px solid #d5e5f5;border-radius:var(--radius);padding:10px 14px;font-size:.8rem;color:var(--ink2);margin-bottom:14px}
+
+/* ===== 周/月表格 ===== */
+.tbl-wrap{overflow-x:auto;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);-webkit-overflow-scrolling:touch}
+table.grid{border-collapse:collapse;width:max-content;min-width:100%;font-size:.8rem}
+.grid th,.grid td{border:1px solid #eee;padding:0;text-align:center;white-space:nowrap}
+.grid thead th{background:#f8f8f8;font-weight:600;color:#444;position:sticky;top:0;z-index:2}
+.grid thead th.we{background:var(--c-weekend);color:var(--red)}
+.grid .rowhead{position:sticky;left:0;z-index:1;background:inherit;text-align:left;padding:4px 8px;min-width:150px;max-width:220px;font-size:.75rem;border-right:2px solid #ddd}
+.grid tr.grp-row td{background:#f0f0f0;font-weight:700;text-align:left;padding:4px 10px;color:#1a5276}
+.grid td.cell{width:34px;height:30px;cursor:pointer;position:relative}
+.grid td.cell.we{background:#FFF6F6}
+.grid td.cell.off{background:#f5f5f5;color:#ccc;cursor:not-allowed}
+.grid td.cell:hover{outline:2px solid var(--accent);outline-offset:-2px}
+.grid td.cell .tick{color:var(--green);font-weight:800}
+.grid td.cell.weekendtask.on{background:#d9f2e3}
+.grid tr.we-row td.we{background:#FFF1F1}
+.grid .sumrow td,.grid .sumcol{font-weight:800;background:#fffdf2;color:var(--red)}
+.grid .total-col{width:52px;font-weight:700;color:var(--red);background:#fffdf2}
+.grid .amt-col{width:48px;font-size:.68rem;color:#888;background:inherit}
+.exp-row-label{font-size:.68rem;color:var(--ink2);line-height:1.1}
+.weekend-cell{cursor:pointer}
+.weekend-cell .exp-badge{position:absolute;top:1px;right:1px;font-size:.6rem;color:var(--accent)}
+
+/* ===== 年视图 ===== */
+.year-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.m-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;cursor:pointer;transition:transform .1s}
+.m-card:hover{transform:translateY(-2px)}
+.m-card.cur{outline:2px solid var(--accent)}
+.m-card .m-title{font-weight:800;font-size:.95rem;margin-bottom:8px}
+.m-card .m-line{display:flex;justify-content:space-between;font-size:.78rem;color:var(--ink2);padding:2px 0}
+.m-card .m-line b{color:var(--ink)}
+.m-card .m-inc b{color:var(--green)} .m-card .m-exp b{color:var(--accent)}
+.m-bar{height:6px;background:#eee;border-radius:3px;margin-top:8px;overflow:hidden}
+.m-bar i{display:block;height:100%;background:var(--green);border-radius:3px}
+
+/* ===== 弹层 ===== */
+.modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:#fff;border-radius:14px;padding:18px;width:100%;max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+.modal h3{font-size:1rem;margin-bottom:12px}
+.modal label{display:block;font-size:.78rem;color:var(--ink2);margin:8px 0 4px}
+.modal input{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;font-size:.95rem}
+.modal .m-actions{display:flex;gap:8px;margin-top:16px;justify-content:flex-end}
+.modal .m-actions button{border:0;border-radius:8px;padding:9px 18px;font-size:.88rem;font-weight:600}
+.m-cancel{background:#eee;color:var(--ink)} .m-ok{background:var(--blue);color:#fff}
+.chip-row{display:flex;gap:8px;margin-top:8px}
+.chip{flex:1;border:1.5px solid #e0b97c;background:#fff;border-radius:9px;padding:7px 0;font-size:.88rem;font-weight:700;color:#a06a1a}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.m-err{color:var(--red);font-size:.75rem;margin-top:6px;min-height:1em}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:rgba(40,40,40,.92);color:#fff;padding:10px 18px;border-radius:20px;font-size:.85rem;z-index:200;max-width:88vw;text-align:center;transition:opacity .3s}
+.file-badge{display:inline-flex;align-items:center;gap:4px;background:#e8f8ee;color:var(--green);border-radius:8px;padding:3px 8px;font-size:.7rem;font-weight:600}
+
+footer{max-width:1200px;margin:0 auto;padding:6px 16px 20px;font-size:.7rem;color:#aaa;text-align:center}
+
+/* ===== 响应式 ===== */
+@media (max-width:1023px){ /* 平板竖屏/手机 */
+  .range .lbl{min-width:88px}
+  .sum-card{min-width:90px;padding:8px 10px}
+  .sum-card .v{font-size:1.1rem}
+}
+@media (max-width:699px){ /* 手机 */
+  html{font-size:14.5px}
+  .hd-tools button{padding:4px 8px}
+  table.grid{font-size:.72rem}
+  .grid .rowhead{min-width:110px;max-width:150px;font-size:.68rem}
+  .grid td.cell{width:28px;height:27px}
+}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🧹 家务零花钱打卡</h1>
-            <div class="date" id="currentDate"></div>
-        </div>
-        
-        <div class="role-switch">
-            <button class="role-btn active" onclick="switchRole('child')">👦 孩子端</button>
-            <button class="role-btn" onclick="switchRole('parent')">👨 家长端</button>
-        </div>
-        
-        <div id="childPage" class="page active">
-            <div class="device-info">📱 本地存储 | 数据保存在当前设备浏览器中</div>
-            
-            <div class="stats-row">
-                <div class="stat-card">
-                    <div class="stat-value" id="todayAmount">¥0.0</div>
-                    <div class="stat-label">今日收入</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="monthAmount">¥0.0</div>
-                    <div class="stat-label">本月累计</div>
-                </div>
-            </div>
-            
-            <div id="taskList"></div>
-        </div>
-        
-        <div id="parentPage" class="page">
-            <div id="loginSection">
-                <div class="login-form">
-                    <div class="form-group">
-                        <label>家长密码</label>
-                        <input type="password" id="parentPassword" placeholder="请输入密码">
-                    </div>
-                    <button class="btn btn-primary" onclick="login()">登录</button>
-                </div>
-            </div>
-            
-            <div id="parentPanel" style="display:none;">
-                <div class="device-info">👨 家长模式 | 可审核记录、查看历史</div>
-                
-                <div class="card">
-                    <div class="card-title">👦 孩子信息</div>
-                    <div id="childInfo"></div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-title">📋 今日待审核 <span id="pendingCount" style="font-size:12px;color:#999;font-weight:normal;"></span></div>
-                    <div id="approvalList"></div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-title">📊 本月统计</div>
-                    <div id="monthStats"></div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-title">📅 历史记录 <button class="export-btn" onclick="exportHistory()" style="margin-left:8px;">📥 导出</button></div>
-                    <div class="month-selector">
-                        <select id="historyYear" onchange="loadHistory()"></select>
-                        <select id="historyMonth" onchange="loadHistory()"></select>
-                        <button onclick="loadHistory()">查询</button>
-                    </div>
-                    <div id="historyTable" style="overflow-x:auto;"></div>
-                </div>
-                
-                <div class="card">
-                    <div class="card-title">⚙️ 设置</div>
-                    <div class="settings-item" onclick="showSettings()">
-                        <span class="settings-icon">👤</span>
-                        <span class="settings-text">修改孩子信息</span>
-                        <span class="settings-arrow">›</span>
-                    </div>
-                    <div class="settings-item" onclick="changePassword()">
-                        <span class="settings-icon">🔒</span>
-                        <span class="settings-text">修改密码</span>
-                        <span class="settings-arrow">›</span>
-                    </div>
-                    <div class="settings-item" onclick="clearData()">
-                        <span class="settings-icon">🗑️</span>
-                        <span class="settings-text">清除所有数据</span>
-                        <span class="settings-arrow">›</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+<header>
+  <div class="hd-top">
+    <span class="hd-title">🌟 家务零花钱 · <span class="child" id="childName" title="点击修改昵称">孩子</span></span>
+    <span class="hd-bal">
+      <span id="fileBadge" style="display:none" class="file-badge">📁 <span id="fileName"></span> <button id="unbindFile" style="border:0;background:transparent;color:inherit;cursor:pointer;text-decoration:underline;padding:0">解除</button></span>
+      <span class="game-sum" id="hdGame"></span>
+      <span class="total-chip" title="孩子每日积累零花钱总数，消费自动减扣">
+        <div class="tc-k">💰 总计</div>
+        <div class="tc-v" id="hdBalance">¥0</div>
+        <div class="tc-sub"><span id="hdIncSum">累计收入 ¥0</span> · <span id="hdExpSum">已消费 ¥0</span></div>
+      </span>
+    </span>
+  </div>
+  <div class="hd-nav">
+    <div class="views" id="viewTabs">
+      <button data-v="day">日</button><button data-v="week">周</button><button data-v="month">月</button><button data-v="year">年</button>
     </div>
-    
-    <div class="modal" id="settingsModal">
-        <div class="modal-content">
-            <div class="modal-title">修改孩子信息</div>
-            <div class="form-group"><label>孩子姓名</label><input type="text" id="childName" placeholder="输入姓名"></div>
-            <div class="form-group"><label>班级</label><input type="text" id="childClass" placeholder="输入班级"></div>
-            <button class="btn btn-success" onclick="saveSettings()">保存</button>
-            <button class="btn btn-danger" style="margin-top:8px" onclick="closeModal()">取消</button>
-        </div>
+    <div class="range">
+      <button id="navPrev">‹</button>
+      <span class="lbl" id="navLabel">—</span>
+      <button id="navNext">›</button>
+      <button class="range today-btn" id="navToday">今天</button>
     </div>
-    
-    <div class="modal" id="passwordModal">
-        <div class="modal-content">
-            <div class="modal-title">修改密码</div>
-            <div class="form-group"><label>新密码</label><input type="password" id="newPassword" placeholder="输入新密码"></div>
-            <div class="form-group"><label>确认密码</label><input type="password" id="confirmPassword" placeholder="再次输入密码"></div>
-            <button class="btn btn-success" onclick="savePassword()">保存</button>
-            <button class="btn btn-danger" style="margin-top:8px" onclick="closeModal()">取消</button>
-        </div>
+  </div>
+  <div class="hd-tools">
+    <button id="btnExport">📤 导出 JSON</button>
+    <button id="btnImport">📥 导入 JSON</button>
+    <button id="btnBind" style="display:none">🔗 绑定数据文件</button>
+    <input type="file" id="importFile" accept=".json,application/json" style="display:none">
+  </div>
+</header>
+
+<main id="main"></main>
+
+<footer>数据保存在本机浏览器 · 可导出 JSON 备份/换机迁移 · 周末可用零花钱兑换游戏时间（¥<span id="ftRate">5</span>/小时）及自定义消费</footer>
+
+<script>
+"use strict";
+/* ================= 默认任务配置（源自 2026年9月 v2 打卡表） ================= */
+const DEFAULT_TASKS = [
+  {id:"t01", group:"🌅 晨间", name:"按时起床、叠好被子", amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t02", group:"🌅 晨间", name:"整理床铺",           amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t03", group:"🌅 晨间", name:"吃早餐（不催促）",   amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t04", group:"🌅 晨间", name:"准备当天上学用品",   amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t05", group:"🏠 家务", name:"摆碗筷、收拾餐桌",   amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t06", group:"🏠 家务", name:"扫地/拖地（自己房间）", amount:1, amountText:"+1元",  weekendOnly:false},
+  {id:"t07", group:"🏠 家务", name:"倒垃圾（分类）",     amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t08", group:"🏠 家务", name:"擦桌子/擦窗台/卫生间/洗手台", amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t09", group:"🏠 家务", name:"整理玩具/书籍",      amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t10", group:"🏠 家务", name:"周末：洗菜/择菜/洗袜子/折叠衣服等", amount:1, amountText:"+1~3元", weekendOnly:true},
+  {id:"t11", group:"📚 学习", name:"按时完成作业（无催促）", amount:2, amountText:"+2元", weekendOnly:false},
+  {id:"t12", group:"📚 学习", name:"主动复习/预习",      amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t13", group:"📚 学习", name:"课外阅读30分钟",     amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t14", group:"📚 学习", name:"练字/书法练习",      amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t15", group:"📚 学习", name:"完成额外练习题",     amount:1,   amountText:"+1元/套", weekendOnly:false},
+  {id:"t16", group:"📚 学习", name:"整理书包/学习资料",  amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t17", group:"📚 学习", name:"背单词/古诗词（10个）", amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t18", group:"🏃 运动", name:"跳绳100下",          amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t19", group:"🏃 运动", name:"跑步/慢跑800米",     amount:1.5, amountText:"+1.5元", weekendOnly:false},
+  {id:"t20", group:"🏃 运动", name:"仰卧起坐30个",       amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t21", group:"🏃 运动", name:"坐位体前屈练习（10分钟）", amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t22", group:"🏃 运动", name:"立定跳远练习（10M）", amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t23", group:"🏃 运动", name:"开合跳/高抬腿（5M）", amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t24", group:"🏃 运动", name:"球类运动（篮球/足球/乒乓球等）10M", amount:1.5, amountText:"+1.5元", weekendOnly:false},
+];
+const GROUP_CLASS = {"🌅 晨间":"grp-morning","🏠 家务":"grp-chore","📚 学习":"grp-study","🏃 运动":"grp-sport"};
+const LS_KEY = "chore-app-data";
+const IDB = {db:null};
+
+/* ================= 状态 ================= */
+let state = loadState();
+let view = null;                 // 'day'|'week'|'month'|'year'
+let cursor = new Date(); cursor.setHours(0,0,0,0);
+let gamePick = 1;                // 游戏兑换临时选择（小时）
+let fileHandle = null;
+
+function defaultState(){
+  return {version:1, childName:"孩子", config:{gameRate:5, tasks:DEFAULT_TASKS.map(t=>({...t}))}, records:{}, expenses:{}};
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return defaultState();
+    const s = JSON.parse(raw);
+    if(s && s.version===1 && Array.isArray(s.config?.tasks)){
+      s.config.gameRate = s.config.gameRate>0 ? s.config.gameRate : 5;
+      s.records = s.records||{}; s.expenses = s.expenses||{};
+      return s;
+    }
+  }catch(e){ console.warn("读取本地数据失败",e); }
+  return defaultState();
+}
+function saveState(){
+  localStorage.setItem(LS_KEY, JSON.stringify(state));
+  writeBoundFile();  // 若绑定了真实文件则同步
+}
+
+/* ================= 日期工具 ================= */
+const WEEK_CN = ["周日","周一","周二","周三","周四","周五","周六"];
+function pad(n){return n<10?"0"+n:""+n}
+function dkey(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function parseKey(k){const [y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d)}
+function isWeekend(d){const w=d.getDay();return w===0||w===6}
+function daysInMonth(y,m){return new Date(y,m+1,0).getDate()}
+function weekStart(d){const x=new Date(d);const off=(x.getDay()+6)%7;x.setDate(x.getDate()-off);x.setHours(0,0,0,0);return x}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+function addMonths(d,n){const x=new Date(d.getFullYear(),d.getMonth()+n,Math.min(d.getDate(),daysInMonth(d.getFullYear(),d.getMonth()+n)));return x}
+
+/* ================= 计算 ================= */
+function tasks(){return state.config.tasks}
+function dayIncome(dk){
+  const rec = state.records[dk]; if(!rec) return 0;
+  let s=0; for(const tid in rec){const v=rec[tid]; if(v&&v.done) s+=v.amount||0;}
+  return Math.round(s*100)/100;
+}
+function dayExpense(dk){
+  const list = state.expenses[dk]; if(!Array.isArray(list)) return 0;
+  return Math.round(list.reduce((s,e)=>s+(e.amount||0),0)*100)/100;
+}
+function dayGameHours(dk){
+  const list = state.expenses[dk]; if(!Array.isArray(list)) return 0;
+  return list.filter(e=>e.type==="game").reduce((s,e)=>s+(e.hours||0),0);
+}
+function rangeStats(startD, endD){ // [start,end] 闭区间，按日遍历
+  let income=0, expense=0, gameHours=0, bestDay=0, maxSingle=0, doneCnt=0, possible=0;
+  const total = tasks().length;
+  for(let d=new Date(startD); d<=endD; d=addDays(d,1)){
+    const dk=dkey(d);
+    const inc=dayIncome(dk); income+=inc; if(inc>maxSingle) maxSingle=inc;
+    expense+=dayExpense(dk); gameHours+=dayGameHours(dk);
+    const rec=state.records[dk]||{};
+    for(const t of tasks()){
+      if(t.weekendOnly && !isWeekend(d)) continue;
+      possible++; if(rec[t.id]&&rec[t.id].done) doneCnt++;
+    }
+  }
+  income=Math.round(income*100)/100; expense=Math.round(expense*100)/100;
+  bestDay=0;
+  return {income, expense, gameHours, maxSingle, doneCnt, possible};
+}
+// 总结余 = 全部已记录收入 - 全部已记录支出（不按日期截断，避免未来打卡不计入）
+function allIncome(){ let s=0; for(const dk in state.records) s+=dayIncome(dk); return Math.round(s*100)/100; }
+function allExpense(){ let s=0; for(const dk in state.expenses) s+=dayExpense(dk); return Math.round(s*100)/100; }
+function totalBalance(){ return Math.round((allIncome()-allExpense())*100)/100; }
+function totalGameHours(){
+  let h=0; for(const dk in state.expenses) h+=dayGameHours(dk);
+  return Math.round(h*100)/100;
+}
+function money(x){
+  const r=Math.round(x*100)/100;
+  return "¥"+(Number.isInteger(r)?r:r.toFixed(r*10%10?2:1));
+}
+
+/* ================= 渲染入口 ================= */
+const $ = s=>document.querySelector(s);
+const main = $("#main");
+
+function pickDefaultView(){ return window.innerWidth>=1024 ? "week" : "day"; }
+function setView(v){ view=v; render(); }
+
+function render(){
+  if(!view) view = pickDefaultView();
+  document.querySelectorAll("#viewTabs button").forEach(b=>b.classList.toggle("on", b.dataset.v===view));
+  $("#childName").textContent = state.childName;
+  $("#ftRate").textContent = state.config.gameRate;
+  $("#hdBalance").textContent = money(totalBalance());
+  $("#hdIncSum").textContent = "累计收入 " + money(allIncome());
+  $("#hdExpSum").textContent = "已消费 " + money(allExpense());
+  const gh = totalGameHours();
+  $("#hdGame").textContent = gh>0 ? "🎮 已兑 "+gh+"h" : "";
+  $("#navLabel").textContent = navLabel();
+  if(view==="day") renderDay();
+  else if(view==="week") renderWeek();
+  else if(view==="month") renderMonth();
+  else renderYear();
+}
+function navLabel(){
+  if(view==="day") return cursor.getFullYear()+"年"+(cursor.getMonth()+1)+"月"+cursor.getDate()+"日 "+WEEK_CN[cursor.getDay()];
+  if(view==="week"){const ws=weekStart(cursor),we=addDays(ws,6);
+    return (ws.getMonth()===we.getMonth()? ws.getFullYear()+"年"+(ws.getMonth()+1)+"月": ws.getFullYear()+"/"+(ws.getMonth()+1)+"/"+ws.getDate())+" 第"+weekNo(cursor)+"周";}
+  if(view==="month") return cursor.getFullYear()+"年"+(cursor.getMonth()+1)+"月";
+  return cursor.getFullYear()+"年";
+}
+function weekNo(d){
+  const y=d.getFullYear(), jan1=new Date(y,0,1);
+  return Math.floor(((d-jan1)/86400000 + jan1.getDay())/7)+1;
+}
+
+/* ---------- 通用结算条 ---------- */
+function summaryBar(label, st){
+  const bal = totalBalance();
+  return `<div class="summary">
+    <div class="sum-card income"><div class="k">${label} · 收入</div><div class="v">${money(st.income)}</div></div>
+    <div class="sum-card expense"><div class="k">${label} · 支出${st.gameHours?`（🎮${st.gameHours}h）`:""}</div><div class="v">${money(st.expense)}</div></div>
+    <div class="sum-card balance"><div class="k">当前总结余</div><div class="v">${money(bal)}</div></div>
+  </div>`;
+}
+
+/* ---------- 日视图 ---------- */
+function renderDay(){
+  const dk = dkey(cursor);
+  const we = isWeekend(cursor);
+  const rec = state.records[dk]||{};
+  let html="";
+  let doneCnt=0, total=0;
+  for(const t of tasks()){ if(t.weekendOnly&&!we) continue; total++; if(rec[t.id]&&rec[t.id].done) doneCnt++; }
+  const pct = total? doneCnt/total : 0;
+  const inc = dayIncome(dk), exp = dayExpense(dk);
+
+  html += `<div class="day-head">
+    <div class="progress-ring">
+      <svg width="56" height="56" viewBox="0 0 56 56">
+        <circle cx="28" cy="28" r="24" fill="none" stroke="#eee" stroke-width="6"/>
+        <circle cx="28" cy="28" r="24" fill="none" stroke="${pct>=1?'#1e8449':'#F5A623'}" stroke-width="6" stroke-linecap="round"
+          stroke-dasharray="${(2*Math.PI*24).toFixed(1)}" stroke-dashoffset="${(2*Math.PI*24*(1-pct)).toFixed(1)}"/>
+      </svg>
+      <div class="pr-txt">${doneCnt}/${total}</div>
     </div>
-    
-    <script>
-        const TASKS = [
-            { group: '🌅 晨间', tasks: [
-                { name: '按时起床、叠好被子', amount: 1.0, icon: '⏰', weekend: false },
-                { name: '整理床铺', amount: 0.5, icon: '🛏️', weekend: false },
-                { name: '吃早餐（不催促）', amount: 0.5, icon: '🍳', weekend: false },
-                { name: '准备当天上学用品', amount: 0.5, icon: '🎒', weekend: false },
-            ]},
-            { group: '🏠 家务', tasks: [
-                { name: '摆碗筷、收拾餐桌', amount: 1.0, icon: '🍽️', weekend: false },
-                { name: '扫地/拖地（自己房间）', amount: 1.0, icon: '🧹', weekend: false },
-                { name: '倒垃圾（分类）', amount: 0.5, icon: '🗑️', weekend: false },
-                { name: '擦桌子', amount: 0.5, icon: '🧽', weekend: false },
-                { name: '整理玩具/书籍', amount: 0.5, icon: '🧸', weekend: false },
-                { name: '周末：洗菜/择菜/洗袜子等', amount: 2.0, icon: '🧺', weekend: true },
-            ]},
-            { group: '📚 学习', tasks: [
-                { name: '按时完成作业（无催促）', amount: 2.0, icon: '📝', weekend: false },
-                { name: '主动复习/预习', amount: 1.0, icon: '📖', weekend: false },
-                { name: '课外阅读30分钟', amount: 1.0, icon: '📚', weekend: false },
-                { name: '练字/书法练习', amount: 1.0, icon: '✍️', weekend: false },
-                { name: '完成额外练习题', amount: 1.0, icon: '📐', weekend: false },
-                { name: '整理书包/学习资料', amount: 0.5, icon: '📁', weekend: false },
-                { name: '背单词/古诗词（10个）', amount: 0.5, icon: '🔤', weekend: false },
-            ]},
-            { group: '🏃 运动', tasks: [
-                { name: '跳绳100下', amount: 1.0, icon: '⏭️', weekend: false },
-                { name: '跑步/慢跑800米', amount: 1.5, icon: '🏃', weekend: false },
-                { name: '仰卧起坐30个', amount: 1.0, icon: '💪', weekend: false },
-                { name: '坐位体前屈练习', amount: 0.5, icon: '🤸', weekend: false },
-                { name: '立定跳远练习', amount: 0.5, icon: '🦘', weekend: false },
-                { name: '开合跳/高抬腿（5分钟）', amount: 1.0, icon: '🔥', weekend: false },
-                { name: '球类运动（篮球/足球/乒乓球等）', amount: 1.5, icon: '⚽', weekend: false },
-            ]}
-        ];
-        
-        let data = { profile: { name: '小朋友', class: '', password: '123456' }, checks: {}, approvals: [] };
-        let isParentLoggedIn = false;
-        
-        function init() {
-            loadData(); updateDate(); renderTasks(); updateStats(); checkParentLogin(); initMonthSelectors(); loadHistory();
-        }
-        
-        function loadData() {
-            const saved = localStorage.getItem('choreData');
-            if (saved) data = JSON.parse(saved);
-        }
-        
-        function saveData() { localStorage.setItem('choreData', JSON.stringify(data)); }
-        
-        function updateDate() {
-            const now = new Date();
-            const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
-            document.getElementById('currentDate').textContent = now.toLocaleDateString('zh-CN', options);
-        }
-        
-        function switchRole(role) {
-            document.querySelectorAll('.role-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-            if (role === 'child') {
-                document.querySelector('.role-btn:nth-child(1)').classList.add('active');
-                document.getElementById('childPage').classList.add('active');
-            } else {
-                document.querySelector('.role-btn:nth-child(2)').classList.add('active');
-                document.getElementById('parentPage').classList.add('active');
-                renderParentPanel();
-            }
-        }
-        
-        function renderTasks() {
-            const container = document.getElementById('taskList');
-            const today = getTodayKey();
-            const isWeekend = new Date().getDay() === 0 || new Date().getDay() === 6;
-            
-            container.innerHTML = TASKS.map(group => {
-                const tasksHtml = group.tasks.map(task => {
-                    const taskId = `${group.group}-${task.name}`;
-                    const isChecked = data.checks[taskId] === today;
-                    const isWeekendTask = task.weekend && !isWeekendDay(today);
-                    return `<div class="task-item ${isChecked ? 'checked' : ''} ${isWeekendTask ? 'disabled' : ''}" onclick="${isWeekendTask ? '' : `toggleTask('${taskId}', '${task.name}', ${task.amount})`}">
-                        <div class="task-check"></div><span class="task-icon">${task.icon}</span><span class="task-name">${task.name}</span>
-                        <span class="task-amount">+¥${task.amount.toFixed(1)}</span>${task.weekend ? '<span class="task-weekend">🌙</span>' : ''}
-                    </div>`;
-                }).join('');
-                return `<div class="task-group"><div class="group-header">${group.group}</div>${tasksHtml}</div>`;
-            }).join('');
-        }
-        
-        function toggleTask(taskId, taskName, amount) {
-            const today = getTodayKey();
-            if (data.checks[taskId] === today) delete data.checks[taskId];
-            else data.checks[taskId] = today;
-            saveData(); renderTasks(); updateStats(); addApproval(taskName, amount, today);
-        }
-        
-        function addApproval(taskName, amount, date) {
-            data.approvals.unshift({ id: Date.now(), task: taskName, amount: amount, date: date, status: 'pending', timestamp: new Date().toISOString() });
-            saveData();
-        }
-        
-        function updateStats() {
-            const today = getTodayKey();
-            const todayChecks = Object.entries(data.checks).filter(([_, date]) => date === today).reduce((sum, [taskId]) => sum + (findTask(taskId) ? findTask(taskId).amount : 0), 0);
-            const now = new Date();
-            const monthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            const monthChecks = Object.entries(data.checks).filter(([_, date]) => date.startsWith(monthPrefix)).reduce((sum, [taskId]) => sum + (findTask(taskId) ? findTask(taskId).amount : 0), 0);
-            document.getElementById('todayAmount').textContent = `¥${todayChecks.toFixed(1)}`;
-            document.getElementById('monthAmount').textContent = `¥${monthChecks.toFixed(1)}`;
-        }
-        
-        function findTask(taskId) {
-            for (const group of TASKS) for (const task of group.tasks) if (`${group.group}-${task.name}` === taskId) return task;
-            return null;
-        }
-        
-        function getTodayKey() { return new Date().toISOString().split('T')[0]; }
-        function isWeekendDay(dateKey) { const d = new Date(dateKey); return d.getDay() === 0 || d.getDay() === 6; }
-        
-        function initMonthSelectors() {
-            const yearSelect = document.getElementById('historyYear');
-            const monthSelect = document.getElementById('historyMonth');
-            const currentYear = new Date().getFullYear();
-            for (let year = currentYear - 1; year <= currentYear + 1; year++) {
-                const option = document.createElement('option');
-                option.value = year; option.textContent = year + '年';
-                yearSelect.appendChild(option);
-            }
-            yearSelect.value = currentYear;
-            for (let month = 1; month <= 12; month++) {
-                const option = document.createElement('option');
-                option.value = month; option.textContent = month + '月';
-                monthSelect.appendChild(option);
-            }
-            monthSelect.value = new Date().getMonth() + 1;
-        }
-        
-        function loadHistory() {
-            const year = parseInt(document.getElementById('historyYear').value);
-            const month = parseInt(document.getElementById('historyMonth').value);
-            const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
-            const monthChecks = Object.entries(data.checks).filter(([_, date]) => date.startsWith(monthPrefix));
-            const taskMap = {};
-            TASKS.forEach(group => group.tasks.forEach(task => { taskMap[`${group.group}-${task.name}`] = { name: task.name, icon: task.icon, amount: task.amount }; }));
-            const daysInMonth = new Date(year, month, 0).getDate();
-            const dates = Array.from({ length: daysInMonth }, (_, i) => ({ key: `${monthPrefix}-${String(i+1).padStart(2, '0')}`, day: i+1 }));
-            
-            let html = '<table class="history-table"><thead><tr><th style="width:25%">任务</th>';
-            dates.forEach(d => { const dayOfWeek = new Date(d.key).getDay(); const isWeekend = dayOfWeek === 0 || dayOfWeek === 6; html += `<th style="${isWeekend ? 'background:#FFF3E0' : ''}">${d.day}<br><span style="font-size:9px">${['日','一','二','三','四','五','六'][dayOfWeek]}</span></th>`; });
-            html += '<th style="background:#E8F5E9">合计</th></tr></thead><tbody>';
-            Object.entries(taskMap).forEach(([taskId, task]) => {
-                html += `<tr><td class="task-name">${task.icon} ${task.name}</td>`;
-                let total = 0;
-                dates.forEach(d => { const isChecked = monthChecks.some(([tid, date]) => tid === taskId && date === d.key); if (isChecked) { html += '<td class="checked">✓</td>'; total += task.amount; } else { html += '<td class="not-checked">-</td>'; } });
-                html += `<td class="amount">¥${total.toFixed(1)}</td></tr>`;
-            });
-            html += '</tbody></table>';
-            document.getElementById('historyTable').innerHTML = html;
-        }
-        
-        function exportHistory() {
-            const year = parseInt(document.getElementById('historyYear').value);
-            const month = parseInt(document.getElementById('historyMonth').value);
-            const monthPrefix = `${year}-${String(month).padStart(2, '0')}`;
-            const monthChecks = Object.entries(data.checks).filter(([_, date]) => date.startsWith(monthPrefix));
-            let csv = '任务,金额,';
-            const daysInMonth = new Date(year, month, 0).getDate();
-            for (let day = 1; day <= daysInMonth; day++) csv += `${monthPrefix}-${String(day).padStart(2, '0')},`;
-            csv += '合计\n';
-            TASKS.forEach(group => group.tasks.forEach(task => {
-                const taskId = `${group.group}-${task.name}`;
-                csv += `"${task.name}",${task.amount},`;
-                let total = 0;
-                for (let day = 1; day <= daysInMonth; day++) {
-                    const dateKey = `${monthPrefix}-${String(day).padStart(2, '0')}`;
-                    const isChecked = monthChecks.some(([tid, date]) => tid === taskId && date === dateKey);
-                    csv += (isChecked ? '✓' : '-') + ',';
-                    if (isChecked) total += task.amount;
-                }
-                csv += `¥${total.toFixed(1)}\n`;
-            }));
-            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `家务打卡_${year}年${month}月.csv`;
-            link.click();
-        }
-        
-        function login() {
-            const password = document.getElementById('parentPassword').value;
-            if (password === data.profile.password) {
-                sessionStorage.setItem('parentLoggedIn', 'true');
-                isParentLoggedIn = true;
-                document.getElementById('loginSection').style.display = 'none';
-                document.getElementById('parentPanel').style.display = 'block';
-                renderParentPanel();
-            } else alert('密码错误');
-        }
-        
-        function checkParentLogin() {
-            if (sessionStorage.getItem('parentLoggedIn') === 'true') {
-                isParentLoggedIn = true;
-                document.getElementById('loginSection').style.display = 'none';
-                document.getElementById('parentPanel').style.display = 'block';
-            }
-        }
-        
-        function renderParentPanel() {
-            document.getElementById('childInfo').innerHTML = `<div style="font-size:18px;font-weight:600;">${data.profile.name}</div><div style="font-size:14px;color:#666;">${data.profile.class || '未设置班级'}</div>`;
-            const today = getTodayKey();
-            const todayApprovals = data.approvals.filter(a => a.date === today && a.status === 'pending');
-            document.getElementById('pendingCount').textContent = `(待审核 ${todayApprovals.length} 条)`;
-            if (todayApprovals.length === 0) {
-                document.getElementById('approvalList').innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>今日暂无待审核记录</div></div>';
-            } else {
-                document.getElementById('approvalList').innerHTML = todayApprovals.map(a => `<div class="approval-item pending"><div class="approval-info"><div class="approval-name">${a.task}</div><div class="approval-date">${formatTime(a.timestamp)}</div></div><div class="approval-amount">+¥${a.amount.toFixed(1)}</div><button class="btn btn-success" style="width:auto;padding:8px 16px;margin-left:8px;" onclick="approveTask(${a.id})">审核</button></div>`).join('');
-            }
-            const monthPrefix = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-            const monthApprovals = data.approvals.filter(a => a.date.startsWith(monthPrefix));
-            const totalAmount = monthApprovals.reduce((sum, a) => sum + a.amount, 0);
-            const approvedAmount = monthApprovals.filter(a => a.status === 'approved').reduce((sum, a) => sum + a.amount, 0);
-            document.getElementById('monthStats').innerHTML = `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><span>本月累计收入</span><span style="font-weight:600;color:#4CAF50;">¥${totalAmount.toFixed(1)}</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #eee;"><span>已审核金额</span><span style="font-weight:600;color:#2196F3;">¥${approvedAmount.toFixed(1)}</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;"><span>审核记录数</span><span style="font-weight:600;">${monthApprovals.length}条</span></div>`;
-        }
-        
-        function approveTask(id) { const approval = data.approvals.find(a => a.id === id); if (approval) { approval.status = 'approved'; saveData(); renderParentPanel(); } }
-        function showSettings() { document.getElementById('childName').value = data.profile.name; document.getElementById('childClass').value = data.profile.class; document.getElementById('settingsModal').classList.add('show'); }
-        function saveSettings() { data.profile.name = document.getElementById('childName').value || '小朋友'; data.profile.class = document.getElementById('childClass').value; saveData(); closeModal(); renderParentPanel(); }
-        function changePassword() { document.getElementById('passwordModal').classList.add('show'); }
-        function savePassword() { const newPwd = document.getElementById('newPassword').value; const confirmPwd = document.getElementById('confirmPassword').value; if (!newPwd) { alert('请输入新密码'); return; } if (newPwd !== confirmPwd) { alert('两次密码不一致'); return; } data.profile.password = newPwd; saveData(); closeModal(); alert('密码已修改'); }
-        function closeModal() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('show')); document.getElementById('newPassword').value = ''; document.getElementById('confirmPassword').value = ''; }
-        function clearData() { if (confirm('确定要清除所有数据吗？此操作不可恢复！')) { data = { profile: { name: '小朋友', class: '', password: '123456' }, checks: {}, approvals: [] }; saveData(); renderParentPanel(); alert('数据已清除'); } }
-        function formatTime(isoString) { const date = new Date(isoString); return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`; }
-        
-        window.onload = init;
-    </script>
+    <div class="d-info"><div class="d-date">${cursor.getMonth()+1}月${cursor.getDate()}日 · ${WEEK_CN[cursor.getDay()]}${we?' 🎈':''}</div>
+      <div class="d-sub">${pct>=1&&total>0?"🎉 全部完成，太棒了！":"点击任务卡片即可打卡"}</div></div>
+    <div class="day-income">当日收入<b>${money(inc)}</b>${exp?`<span style="color:var(--accent);font-size:.75rem">支出 ${money(exp)}</span>`:""}</div>
+  </div>`;
+
+  if(we){
+    const avail = totalBalance();
+    html += `<div class="spend-card">
+      <h3>🎁 周末兑换 <span class="bal-hint">可用结余 ${money(avail)}</span></h3>
+      <div class="game-hours">
+        ${[1,2,3,4,5].map(h=>`<button class="gh-btn ${gamePick===h?'on':''}" data-h="${h}">${h}小时<small>${money(h*state.config.gameRate)}</small></button>`).join("")}
+      </div>
+      <div class="custom-game">自定义时长 <input type="number" id="ghCustom" min="0.5" step="0.5" value="${gamePick}"> 小时 ·
+        <b style="color:var(--accent)" id="ghCost">${money(gamePick*state.config.gameRate)}</b></div>
+      <div class="spend-actions">
+        <button class="btn-redeem" id="btnRedeem">🎮 兑换游戏时间</button>
+        <button class="btn-add-exp" id="btnAddExp">➕ 添加消费项</button>
+      </div>
+      ${renderDayExpenses(dk)}
+    </div>`;
+  }else{
+    html += `<div class="midweek-note">📅 兑换游戏时间和自定义消费仅限<strong>周六、周日</strong>进行，平时坚持打卡攒零花钱吧！</div>`;
+  }
+
+  const groups = {};
+  for(const t of tasks()){ (groups[t.group]=groups[t.group]||[]).push(t); }
+  for(const g in groups){
+    let gDone=0,gSum=0,gTotal=0;
+    let rows = groups[g].map(t=>{
+      const off = t.weekendOnly && !we;
+      const on = !off && rec[t.id] && rec[t.id].done;
+      if(!off){gTotal++; if(on){gDone++; gSum+=rec[t.id].amount||0;}}
+      return `<div class="task ${on?'done':''} ${off?'off':''}" data-task="${t.id}">
+        <span class="ck">${on?'✓':''}</span><span class="nm">${t.name}${t.weekendOnly?' <span style="font-size:.65rem;color:var(--red)">仅周末</span>':''}</span>
+        <span class="amt">${off?'—':(on?'+'+money(rec[t.id].amount).slice(1)+'元':t.amountText)}</span></div>`;
+    }).join("");
+    html += `<div class="grp ${GROUP_CLASS[g]}"><div class="grp-title">${g}<span class="gt-sum">${gDone}/${gTotal} · ${money(gSum)}</span></div>
+      <div class="task-list">${rows}</div></div>`;
+  }
+  main.innerHTML = html;
+  bindDay();
+}
+function renderDayExpenses(dk){
+  const list = state.expenses[dk];
+  if(!Array.isArray(list)||!list.length) return "";
+  return `<div class="day-expenses">${list.map((e,i)=>`<div class="exp-item">
+    <span class="ex-nm">${e.type==="game"?"🎮 游戏时间 "+e.hours+" 小时":"🛒 "+escapeHtml(e.name||"消费")}</span>
+    <span class="ex-amt">-${money(e.amount)}</span>
+    <button class="ex-del" data-expidx="${i}" title="撤销">✕</button></div>`).join("")}</div>`;
+}
+function bindDay(){
+  main.querySelectorAll(".task:not(.off)").forEach(el=>{
+    el.addEventListener("click", ()=>{ toggleTask(el.dataset.task, dkey(cursor)); });
+  });
+  main.querySelectorAll(".gh-btn").forEach(b=>b.addEventListener("click",()=>{gamePick=+b.dataset.h;render();}));
+  const ci=$("#ghCustom"); if(ci) ci.addEventListener("change",()=>{
+    const v=clampHours(+ci.value||0.5); gamePick=v; render();
+  });
+  const br=$("#btnRedeem"); if(br) br.addEventListener("click",()=>redeemGame(dkey(cursor)));
+  const ba=$("#btnAddExp"); if(ba) ba.addEventListener("click",()=>openCustomExpense(dkey(cursor)));
+  main.querySelectorAll(".ex-del").forEach(b=>b.addEventListener("click",()=>{delExpense(dkey(cursor),+b.dataset.expidx);}));
+}
+function clampHours(v){v=Math.floor(v*2)/2; return Math.max(0.5, Math.min(v, 24));}
+
+function toggleTask(tid, dk){
+  state.records[dk] = state.records[dk]||{};
+  const t = tasks().find(x=>x.id===tid); if(!t) return;
+  if(t.weekendOnly && !isWeekend(parseKey(dk))){ toast("该任务仅周末可打卡"); return; }
+  const cur = state.records[dk][tid];
+  if(cur && cur.done){ delete state.records[dk][tid]; if(!Object.keys(state.records[dk]).length) delete state.records[dk]; }
+  else if(t.weekendOnly){ openWeekendAmount(t, dk); return; }  // 周末家务：自由设定所得金额
+  else state.records[dk][tid] = {done:true, amount:t.amount};
+  saveState(); render();
+}
+function openWeekendAmount(t, dk){
+  showModal({
+    title:`✅ ${t.name}`,
+    fields:[{id:"wamt", label:`本次获得金额（元）· 参考 ${t.amountText}`, type:"number", step:"0.5", min:"0.5", placeholder:"输入金额", value:String(t.amount), chips:[1,2,3]}],
+    hint:"点击金额快捷键或直接输入，确认后即可打卡",
+    onOk:(vals,err)=>{
+      const amt=Math.round((+vals.wamt||0)*100)/100;
+      if(!(amt>0)){err("请输入大于 0 的金额");return;}
+      if(amt>20){err("金额看起来过大，请确认");return;}
+      state.records[dk]=state.records[dk]||{};
+      state.records[dk][t.id]={done:true, amount:amt};
+      saveState(); toast(`${t.name.split("：")[0]} ✓ 入账 ${money(amt)}`); render();
+    }
+  });
+}
+
+/* ================= 周末消费 ================= */
+function redeemGame(dk){
+  const cost = Math.round(gamePick*state.config.gameRate*100)/100;
+  const avail = totalBalance();
+  if(cost>avail){ toast("结余不足：需要 "+money(cost)+"，还差 "+money(cost-avail)); return; }
+  state.expenses[dk] = state.expenses[dk]||[];
+  state.expenses[dk].push({type:"game", hours:gamePick, amount:cost});
+  saveState(); toast("🎮 已兑换 "+gamePick+" 小时游戏时间（-"+money(cost)+"）"); render();
+}
+function openCustomExpense(dk){
+  const avail = totalBalance();
+  showModal({
+    title:"➕ 添加消费项（仅周末）",
+    fields:[
+      {id:"cname", label:"消费事项", type:"text", placeholder:"如：买文具 / 冰淇淋 / 玩具", value:""},
+      {id:"camt",  label:"金额（元）", type:"number", step:"0.5", min:"0.5", placeholder:"如：3", value:""}
+    ],
+    hint:"可用结余 "+money(avail),
+    onOk:(vals,err)=>{
+      const name=(vals.cname||"").trim(); const amt=Math.round((+vals.camt||0)*100)/100;
+      if(!name){err("请填写事项名称");return;}
+      if(!(amt>0)){err("金额需大于 0");return;}
+      if(amt>totalBalance()){err("结余不足，还差 "+money(amt-totalBalance()));return;}
+      state.expenses[dk]=state.expenses[dk]||[];
+      state.expenses[dk].push({type:"custom", name, amount:amt});
+      saveState(); toast("已记录消费「"+name+"」-"+money(amt)); render();
+    }
+  });
+}
+function delExpense(dk, idx){
+  const e = (state.expenses[dk]||[])[idx]; if(!e) return;
+  if(!confirm("撤销这笔"+(e.type==="game"?` ${e.hours} 小时游戏兑换`:`「${e.name}」消费`)+"？结余将回退 "+money(e.amount))) return;
+  state.expenses[dk].splice(idx,1);
+  if(!state.expenses[dk].length) delete state.expenses[dk];
+  saveState(); render();
+}
+
+/* ---------- 周视图 ---------- */
+function renderWeek(){
+  const ws = weekStart(cursor);
+  const days = Array.from({length:7},(_,i)=>addDays(ws,i));
+  const dkList = days.map(dkey);
+  const st = rangeStats(ws, addDays(ws,6));
+  const isWe = isWeekend;
+  let html = summaryBar("本周", st);
+  html += `<div class="tbl-wrap"><table class="grid"><thead><tr><th class="rowhead" style="background:#f8f8f8">任务</th><th style="background:#f8f8f8">金额</th>
+    ${days.map((d,i)=>`<th class="${isWe(d)?'we':''}">${WEEK_CN[d.getDay()]}<br><span style="font-weight:400">${d.getMonth()+1}/${d.getDate()}</span></th>`).join("")}
+    <th class="total-col">合计</th></tr></thead><tbody>`;
+  const groups={}; for(const t of tasks()) (groups[t.group]=groups[t.group]||[]).push(t);
+  for(const g in groups){
+    html += `<tr class="grp-row"><td colspan="${9+1}">${g}</td></tr>`;
+    for(const t of groups[g]){
+      let rowSum=0;
+      const cells = days.map((d)=>{
+        const dk=dkey(d), off=t.weekendOnly&&!isWe(d);
+        const on=!off && state.records[dk]?.[t.id]?.done;
+        if(on) rowSum += state.records[dk][t.id].amount||0;
+        return `<td class="cell ${isWe(d)?'we':''} ${off?'off':''} ${on?'weekendtask on':''}" data-dk="${dk}" data-task="${t.id}" data-grid="1">${on?'<span class="tick">✓</span>':off?'':'☐'}</td>`;
+      }).join("");
+      html += `<tr><td class="rowhead" style="background:#fff">${t.name}</td><td class="amt-col">${t.amountText}</td>${cells}<td class="total-col">${rowSum?money(rowSum):""}</td></tr>`;
+    }
+  }
+  // 日收入行
+  html += `<tr class="we-row"><td class="rowhead sumrow" style="text-align:right">当日收入</td><td class="amt-col"></td>
+    ${dkList.map(dk=>{const v=dayIncome(dk);return `<td class="sumrow">${v?money(v):"-"}</td>`}).join("")}<td class="total-col">${money(st.income)}</td></tr>`;
+  html += `<tr class="we-row"><td class="rowhead" style="text-align:right;font-size:.7rem;color:#888">当日支出</td><td class="amt-col"></td>
+    ${dkList.map(dk=>{const v=dayExpense(dk);return `<td class="cell ${v?'weekend-cell':''}" style="${v?'background:#fff3e0':''}">${v?`<span style="color:var(--accent);font-weight:700;font-size:.7rem">${money(v)}</span><span class="exp-badge">${dayGameHours(dk)?'🎮':'🛒'}</span>`:'-'}</td>`}).join("")}<td class="total-col" style="color:var(--accent)">${money(st.expense)}</td></tr>`;
+  html += `</tbody></table></div>
+    <p style="font-size:.72rem;color:#999;margin-top:8px">💡 表格可左右滑动；周末（粉底列）可在「日」视图兑换游戏时间或添加消费。</p>`;
+  main.innerHTML = html;
+  bindGrid();
+}
+
+/* ---------- 月视图（复刻 Excel 转置布局） ---------- */
+function renderMonth(){
+  const y=cursor.getFullYear(), m=cursor.getMonth(), n=daysInMonth(y,m);
+  const st = rangeStats(new Date(y,m,1), new Date(y,m,n));
+  const now = new Date();
+  let html = summaryBar("本月", st);
+  html += `<div class="tbl-wrap"><table class="grid"><thead>
+    <tr><th class="rowhead" style="background:#f8f8f8">任务</th><th style="background:#f8f8f8">金额</th>
+      ${Array.from({length:n},(_,i)=>{const d=new Date(y,m,i+1);return `<th class="${isWeekend(d)?'we':''}">${WEEK_CN[d.getDay()][1]}</th>`}).join("")}
+      <th class="total-col">合计</th></tr>
+    <tr><th class="rowhead" style="background:#f8f8f8"></th><th style="background:#f8f8f8"></th>
+      ${Array.from({length:n},(_,i)=>{const d=new Date(y,m,i+1);return `<th class="${isWeekend(d)?'we':''}" style="${dkey(d)===dkey(now)?'background:#FFE9B8;color:#a06a1a;font-weight:800':''}">${i+1}</th>`}).join("")}
+      <th class="total-col"></th></tr></thead><tbody>`;
+  const groups={}; for(const t of tasks()) (groups[t.group]=groups[t.group]||[]).push(t);
+  for(const g in groups){
+    html += `<tr class="grp-row"><td colspan="${n+3}">${g}</td></tr>`;
+    for(const t of groups[g]){
+      let rowSum=0; const cells=[];
+      for(let i=1;i<=n;i++){
+        const d=new Date(y,m,i), dk=dkey(d), off=t.weekendOnly&&!isWeekend(d);
+        const on=!off && state.records[dk]?.[t.id]?.done;
+        if(on) rowSum += state.records[dk][t.id].amount||0;
+        cells.push(`<td class="cell ${isWeekend(d)?'we':''} ${off?'off':''} ${on?'weekendtask on':''}" style="width:26px;height:24px" data-dk="${dk}" data-task="${t.id}" data-grid="1">${on?'<span class="tick">✓</span>':off?'':'☐'}</td>`);
+      }
+      html += `<tr><td class="rowhead" style="background:#fff">${t.name}</td><td class="amt-col">${t.amountText}</td>${cells.join("")}<td class="total-col">${rowSum?money(rowSum):""}</td></tr>`;
+    }
+  }
+  const dayCells = fn=>{let out="";for(let i=1;i<=n;i++){const d=new Date(y,m,i);out+=fn(d,dkey(d),isWeekend(d))}return out};
+  html += `<tr class="we-row"><td class="rowhead sumrow" style="text-align:right">日收入</td><td class="amt-col"></td>`
+    + dayCells((d,dk)=>`<td class="sumrow" style="width:26px;font-size:.62rem">${dayIncome(dk)||"-"}</td>`)
+    + `<td class="total-col">${money(st.income)}</td></tr>`;
+  html += `<tr class="we-row"><td class="rowhead" style="text-align:right;font-size:.68rem;color:#888">日支出</td><td class="amt-col"></td>`
+    + dayCells((d,dk)=>{const v=dayExpense(dk);return `<td class="cell" style="width:26px;font-size:.62rem;${v?'background:#fff3e0;color:var(--accent);font-weight:700':''}">${v||"-"}</td>`})
+    + `<td class="total-col" style="color:var(--accent)">${money(st.expense)}</td></tr>`;
+  html += `</tbody></table></div>
+    <p style="font-size:.72rem;color:#999;margin-top:8px">📊 本月结算：累计收入 ${money(st.income)} · 最大单日 ${money(st.maxSingle)} · 支出 ${money(st.expense)}${st.gameHours?`（🎮${st.gameHours}h）`:""} · 当前总结余 ${money(totalBalance())} · 打卡 ${st.doneCnt}/${st.possible} 项</p>`;
+  main.innerHTML = html;
+  bindGrid();
+}
+function bindGrid(){
+  main.querySelectorAll("td[data-grid]").forEach(td=>{
+    td.addEventListener("click", ()=>{
+      const {dk, task} = td.dataset;
+      const t = tasks().find(x=>x.id===task);
+      if(t.weekendOnly && !isWeekend(parseKey(dk))){ toast("该任务仅周末可打卡"); return; }
+      toggleTask(task, dk);
+    });
+  });
+}
+
+/* ---------- 年视图 ---------- */
+function renderYear(){
+  const y=cursor.getFullYear(), now=new Date();
+  const st = rangeStats(new Date(y,0,1), new Date(y,11,31));
+  let html = summaryBar(y+" 年", st);
+  html += `<div class="year-grid">`;
+  for(let m=0;m<12;m++){
+    const ms = rangeStats(new Date(y,m,1), new Date(y,m,daysInMonth(y,m)));
+    const cur = (y===now.getFullYear() && m===now.getMonth());
+    const pct = ms.possible? ms.doneCnt/ms.possible : 0;
+    html += `<div class="m-card ${cur?'cur':''}" data-month="${m}">
+      <div class="m-title">${y}年${m+1}月 ${cur?"· 本月":""}</div>
+      <div class="m-line m-inc"><span>收入</span><b>${money(ms.income)}</b></div>
+      <div class="m-line m-exp"><span>支出${ms.gameHours?` 🎮${ms.gameHours}h`:""}</span><b>${money(ms.expense)}</b></div>
+      <div class="m-line"><span>打卡完成</span><b>${ms.doneCnt}/${ms.possible}</b></div>
+      <div class="m-bar"><i style="width:${Math.round(pct*100)}%"></i></div></div>`;
+  }
+  html += `</div>
+    <p style="font-size:.75rem;color:#888;margin-top:12px">🗂 ${y} 年累计：收入 ${money(st.income)} · 支出 ${money(st.expense)}（游戏 ${st.gameHours} 小时）· 打卡 ${st.doneCnt}/${st.possible} 项。<br>点击月份卡片可下钻到该月；总结余（全部年份累计）为 <b style="color:var(--red)">${money(totalBalance())}</b>。</p>`;
+  main.innerHTML = html;
+  main.querySelectorAll(".m-card").forEach(c=>c.addEventListener("click",()=>{
+    cursor=new Date(y, +c.dataset.month, 1); view="month"; render();
+  }));
+}
+
+/* ================= 导航与顶栏 ================= */
+function nav(step){
+  if(view==="day") cursor=addDays(cursor,step);
+  else if(view==="week") cursor=addDays(cursor,7*step);
+  else if(view==="month") cursor=addMonths(cursor,step);
+  else cursor=new Date(cursor.getFullYear()+step, cursor.getMonth(), Math.min(cursor.getDate(),28));
+  render();
+}
+$("#viewTabs").addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(b)setView(b.dataset.v)});
+$("#navPrev").addEventListener("click",()=>nav(-1));
+$("#navNext").addEventListener("click",()=>nav(1));
+$("#navToday").addEventListener("click",()=>{cursor=new Date();cursor.setHours(0,0,0,0);gamePick=1;render()});
+$("#childName").addEventListener("click",()=>{
+  showModal({title:"孩子昵称", fields:[{id:"cn",label:"昵称",type:"text",value:state.childName}],
+    onOk:(v,err)=>{const n=(v.cn||"").trim(); if(!n){err("不能为空");return;} state.childName=n; saveState(); render();}});
+});
+
+/* ================= 导出 / 导入 / 文件绑定 ================= */
+function exportData(){
+  const blob = new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);
+  a.download="家务零花钱打卡_"+dkey(new Date())+".json";
+  a.click(); URL.revokeObjectURL(a.href);
+}
+$("#btnExport").addEventListener("click",()=>{exportData();toast("已导出 JSON 备份文件")});
+$("#btnImport").addEventListener("click",()=>$("#importFile").click());
+$("#importFile").addEventListener("change",e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const s=JSON.parse(r.result);
+      if(!s||s.version!==1||!Array.isArray(s.config?.tasks)) throw new Error("格式不符");
+      if(!confirm("导入将覆盖当前数据，确认继续？")) return;
+      state=s; state.config.gameRate=s.config.gameRate>0?s.config.gameRate:5;
+      saveState(); toast("导入成功"); render();
+    }catch(err){ alert("导入失败："+err.message); }
+  };
+  r.readAsText(f); e.target.value="";
+});
+
+/* ---- File System Access：绑定真实 JSON 文件（PC/平板 Chrome/Edge） ---- */
+const FS_OK = typeof window.showSaveFilePicker==="function";
+if(FS_OK) $("#btnBind").style.display="";
+$("#btnBind").addEventListener("click", async ()=>{
+  try{
+    fileHandle = await window.showSaveFilePicker({suggestedName:"家务零花钱打卡数据.json",
+      types:[{description:"JSON", accept:{"application/json":[".json"]}}]});
+    await idbPut("handle", fileHandle);
+    await writeBoundFile();
+    showFileBadge(fileHandle.name);
+    toast("已绑定数据文件，之后打卡将自动保存");
+  }catch(e){ if(e.name!=="AbortError") toast("绑定失败："+e.message); }
+});
+$("#unbindFile").addEventListener("click", async ()=>{
+  fileHandle=null; await idbDel("handle"); $("#fileBadge").style.display="none"; toast("已解除文件绑定（数据仍在本机 localStorage）");
+});
+async function writeBoundFile(){
+  if(!fileHandle||!view) return;
+  try{
+    if(await fileHandle.queryPermission({mode:"readwrite"})!=="granted"
+       && await fileHandle.requestPermission({mode:"readwrite"})!=="granted"){ fileHandle=null; return; }
+    const w=await fileHandle.createWritable();
+    await w.write(JSON.stringify(state,null,2)); await w.close();
+  }catch(e){ console.warn("写绑定文件失败",e); }
+}
+function showFileBadge(name){ $("#fileBadge").style.display=""; $("#fileName").textContent=name; }
+
+/* ---- IndexedDB：持久化文件 handle ---- */
+function idb(){ return IDB.db ? Promise.resolve(IDB.db) : new Promise((res,rej)=>{
+  const r=indexedDB.open("chore-app",1);
+  r.onupgradeneeded=()=>r.result.createObjectStore("kv");
+  r.onsuccess=()=>{IDB.db=r.result;res(r.result)}; r.onerror=()=>rej(r.error); });}
+async function idbPut(k,v){const db=await idb();return new Promise((res,rej)=>{const tx=db.transaction("kv","readwrite");tx.objectStore("kv").put(v,k);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});}
+async function idbDel(k){const db=await idb();return new Promise((res,rej)=>{const tx=db.transaction("kv","readwrite");tx.objectStore("kv").delete(k);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);});}
+async function idbGet(k){const db=await idb();return new Promise((res,rej)=>{const rq=db.transaction("kv").objectStore("kv").get(k);rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);});}
+(async function restoreHandle(){
+  if(!FS_OK) return;
+  try{
+    const h=await idbGet("handle");
+    if(h && await h.queryPermission({mode:"readwrite"})==="granted"){ fileHandle=h; showFileBadge(h.name); }
+  }catch(e){}
+})();
+
+/* ================= 弹窗与提示 ================= */
+function showModal({title, fields, hint, onOk}){
+  const mask=document.createElement("div"); mask.className="modal-mask";
+  mask.innerHTML=`<div class="modal"><h3>${title}</h3>
+    ${fields.map(f=>`<label for="mf_${f.id}">${f.label}</label><input id="mf_${f.id}" type="${f.type}" ${f.step?`step="${f.step}"`:""} ${f.min?`min="${f.min}"`:""} placeholder="${f.placeholder||""}" value="${f.value??""}">
+    ${f.chips?`<div class="chip-row">${f.chips.map(c=>`<button type="button" class="chip" data-chip-for="mf_${f.id}" data-val="${c}">¥${c}</button>`).join("")}</div>`:""}`).join("")}
+    ${hint?`<p style="font-size:.72rem;color:#999;margin-top:8px">${hint}</p>`:""}
+    <p class="m-err" id="mErr"></p>
+    <div class="m-actions"><button class="m-cancel">取消</button><button class="m-ok">确定</button></div></div>`;
+  document.body.appendChild(mask);
+  const close=()=>mask.remove();
+  mask.addEventListener("click",e=>{ if(e.target===mask) close(); });
+  mask.querySelectorAll(".chip").forEach(ch=>ch.addEventListener("click",()=>{
+    const inp=mask.querySelector("#"+ch.dataset.chipFor); if(inp) inp.value=ch.dataset.val;
+    mask.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on", c===ch));
+  }));
+  mask.querySelector(".m-cancel").onclick=close;
+  mask.querySelector(".m-ok").onclick=()=>{
+    const vals={}; fields.forEach(f=>vals[f.id]=mask.querySelector("#mf_"+f.id).value);
+    onOk(vals, msg=>{mask.querySelector("#mErr").textContent=msg});
+    if(!mask.querySelector("#mErr").textContent) close();
+  };
+  const fi=mask.querySelector("input"); if(fi){fi.focus(); fi.addEventListener("keydown",e=>{if(e.key==="Enter")mask.querySelector(".m-ok").click()});}
+}
+let toastTimer=null;
+function toast(msg){
+  let t=$(".toast"); if(t)t.remove();
+  t=document.createElement("div"); t.className="toast"; t.textContent=msg;
+  document.body.appendChild(t);
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>{t.style.opacity="0";setTimeout(()=>t.remove(),350)},2200);
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+/* ================= 启动 ================= */
+window.addEventListener("resize", ()=>{ /* 视口跨断点时自动切换默认视图 */ });
+render();
+</script>
 </body>
 </html>
