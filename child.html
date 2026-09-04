@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>🌈 我的打卡小天地</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#BDE8FF">
+<style>
+/* ============ 卡通风格儿童端（只读） ============ */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;color:#3a3a3a;min-height:100vh;
+  background:linear-gradient(180deg,#bfe6ff 0%,#d9f0ff 34%,#fff3d6 78%,#ffe7ec 100%);
+  background-attachment:fixed;overflow-x:hidden;padding-bottom:40px}
+button{font-family:inherit;cursor:pointer;border:0;background:none}
+
+/* 漂浮的云朵与星星（纯装饰） */
+.deco{position:fixed;z-index:0;pointer-events:none;user-select:none;font-size:2rem;opacity:.85;
+  animation:floaty 7s ease-in-out infinite}
+.deco.d2{font-size:1.5rem;animation-duration:9s;animation-delay:-3s}
+.deco.d3{font-size:1.2rem;animation-duration:6s;animation-delay:-1.5s}
+.deco.d4{font-size:2.4rem;animation-duration:11s;animation-delay:-5s}
+@keyframes floaty{0%,100%{transform:translateY(0) rotate(-4deg)}50%{transform:translateY(-22px) rotate(5deg)}}
+
+.wrap{position:relative;z-index:1;max-width:680px;margin:0 auto;padding:14px 14px 0}
+
+/* ============ 顶栏 ============ */
+header{text-align:center;padding:10px 0 4px}
+.logo{display:inline-flex;align-items:center;gap:8px;background:#fff;border:3px solid #ffd166;border-radius:999px;
+  padding:8px 20px;font-size:1.15rem;font-weight:900;box-shadow:0 4px 0 #ffd166;color:#b06f13}
+.logo .name{color:#2f8fd8;border-bottom:3px dotted #9fd4ff;line-height:1.15}
+.sub{margin-top:6px;font-size:.78rem;color:#8b8b8b}
+
+/* ============ 日期条 ============ */
+.datebar{display:flex;align-items:center;gap:8px;background:#fff;border:3px solid #c9e8ff;border-radius:22px;
+  box-shadow:0 5px 0 #c9e8ff;padding:10px 12px;margin:14px 0}
+.datebar button{width:44px;height:44px;border-radius:50%;background:#eaf6ff;font-size:1.3rem;font-weight:900;color:#2f8fd8;
+  box-shadow:0 3px 0 #bde0fa;line-height:1}
+.datebar button:active{transform:translateY(2px);box-shadow:none}
+.date-mid{flex:1;text-align:center}
+.date-mid .d1{font-size:1.15rem;font-weight:900}
+.date-mid .d2{font-size:.8rem;color:#9a9a9a;margin-top:2px}
+.today-btn{width:auto!important;border-radius:999px!important;padding:0 14px;font-size:.85rem!important}
+.badge{display:inline-block;background:#ffe9a8;color:#9a6b00;border-radius:999px;padding:1px 10px;font-size:.72rem;font-weight:700;vertical-align:2px}
+
+/* ============ 进度大卡片 ============ */
+.hero{display:flex;align-items:center;gap:14px;background:#fff;border:3px solid #ffd166;border-radius:26px;
+  box-shadow:0 6px 0 #ffd166;padding:16px;margin-bottom:14px}
+.ring{position:relative;width:92px;height:92px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring .txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
+.ring .txt b{font-size:1.5rem;color:#1e8449}
+.ring .txt span{font-size:.66rem;color:#999}
+.hero-info{flex:1}
+.hero-info .title{font-size:1rem;font-weight:900;margin-bottom:6px}
+.bar{height:16px;background:#f1f1f1;border-radius:999px;overflow:hidden;border:2px solid #e2e2e2}
+.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#7ed957,#34b34a);transition:width .6s ease}
+.hero-info .hint{font-size:.8rem;color:#8b8b8b;margin-top:8px}
+.coin{text-align:center;flex:none}
+.coin .face{font-size:2rem;animation:wob 2.4s ease-in-out infinite}
+@keyframes wob{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
+.coin b{display:block;font-size:1.25rem;color:#e07b00}
+.coin span{font-size:.68rem;color:#c9a06a}
+
+/* ============ 任务列表 ============ */
+.sect{margin-bottom:16px}
+.sect-head{display:flex;align-items:center;gap:8px;font-size:1.02rem;font-weight:900;padding:2px 6px}
+.sect-head .cnt{margin-left:auto;background:#fff;border-radius:999px;padding:3px 12px;font-size:.78rem;font-weight:700;
+  box-shadow:0 2px 0 rgba(0,0,0,.06)}
+.list{display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.card{display:flex;align-items:center;gap:12px;background:#fff;border-radius:20px;padding:12px 14px;
+  border:3px solid #dfeff7;box-shadow:0 4px 0 #dfeff7;transition:transform .15s}
+.card:active{transform:scale(.98)}
+.card .face{font-size:1.7rem;flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+  background:#f2fbff;border-radius:50%}
+.card .nm{flex:1;font-size:.95rem;font-weight:700;line-height:1.3}
+.card .nm small{display:block;font-weight:400;font-size:.7rem;color:#a5a5a5;margin-top:2px}
+.card .amt{flex:none;font-weight:900;font-size:.95rem}
+/* 已完成 */
+.sect.done .card{border-color:#bdebcb;box-shadow:0 4px 0 #bdebcb;background:#f4fff2}
+.sect.done .card .amt{color:#1e8449}
+.sect.done .face{background:#e3f8dc;animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.sect.done .card .ck{font-size:1.1rem}
+/* 未完成 */
+.sect.todo .card{border-color:#ffe3b3;box-shadow:0 4px 0 #ffe3b3;background:#fffdf6}
+.sect.todo .card .amt{color:#d99a26;font-size:.8rem;font-weight:700}
+.sect.todo .face{background:#fff3dc;filter:grayscale(.15)}
+.sect.todo .card .ck{font-size:1.1rem}
+.sect-head .tag{font-size:1.2rem}
+.empty{background:#fff;border:3px dashed #d5d5d5;border-radius:20px;padding:22px 14px;text-align:center;color:#9a9a9a;font-size:.88rem}
+.empty .face{font-size:2.2rem;display:block;margin-bottom:6px}
+
+/* 周末任务小标 */
+.wechip{display:inline-block;background:#ffe1e6;color:#d05a6e;border-radius:999px;padding:1px 8px;font-size:.66rem;font-weight:700;margin-left:6px;vertical-align:2px}
+
+/* ============ 底部 ============ */
+.foot{margin-top:18px;text-align:center}
+.readonly-note{display:inline-block;background:#eaf4ff;border:2px dashed #a9cdf5;color:#4a7fb5;border-radius:16px;
+  padding:10px 18px;font-size:.82rem;line-height:1.6}
+.sync{margin-top:10px;font-size:.72rem;color:#9db6cc}
+.sync button{font-size:.72rem;color:#2f8fd8;text-decoration:underline;padding:0 2px}
+footer.credit{margin-top:14px;font-size:.68rem;color:#b6a58c}
+
+/* 全部完成的庆祝横幅 */
+.cheer{display:none;background:linear-gradient(135deg,#fff6d8,#ffe7ec);border:3px solid #ffd166;border-radius:22px;
+  box-shadow:0 5px 0 #ffd166;padding:14px;text-align:center;margin-bottom:14px;font-weight:900;color:#b06f13;font-size:1.05rem}
+.cheer.show{display:block;animation:pop .5s ease}
+.cheer .faces{font-size:1.6rem;letter-spacing:6px}
+
+@media (max-width:420px){
+  html{font-size:15px}
+  .hero{flex-wrap:wrap}
+  .coin{width:100%;display:flex;justify-content:center;gap:10px;align-items:center}
+  .coin .face{font-size:1.6rem}
+}
+</style>
+</head>
+<body>
+<span class="deco"    style="top:6%;left:6%">☁️</span>
+<span class="deco d2" style="top:12%;right:8%">⭐</span>
+<span class="deco d3" style="top:40%;left:3%">🎈</span>
+<span class="deco d4" style="top:55%;right:4%">☁️</span>
+<span class="deco d2" style="top:78%;left:10%">🌟</span>
+
+<div class="wrap">
+  <header>
+    <div class="logo">🌈 <span class="name" id="childName">孩子</span> 的打卡小天地</div>
+    <div class="sub">这里只能看哦 · 每完成一项就会跳进上面的列表 🎪</div>
+  </header>
+
+  <div class="datebar">
+    <button id="navPrev" title="前一天">‹</button>
+    <div class="date-mid">
+      <div class="d1" id="dLabel">—</div>
+      <div class="d2" id="dSub"></div>
+    </div>
+    <button id="navNext" title="后一天">›</button>
+    <button class="today-btn" id="navToday">🏠 今天</button>
+  </div>
+
+  <div class="cheer" id="cheer"><span class="faces">🎉🥳🎊</span><br>哇！今天的任务全部完成，太厉害啦！</div>
+
+  <div class="hero">
+    <div class="ring">
+      <svg width="92" height="92" viewBox="0 0 92 92">
+        <circle cx="46" cy="46" r="38" fill="none" stroke="#f0f0f0" stroke-width="10"/>
+        <circle id="ringArc" cx="46" cy="46" r="38" fill="none" stroke="#7ed957" stroke-width="10" stroke-linecap="round"
+          stroke-dasharray="238.8" stroke-dashoffset="238.8" style="transition:stroke-dashoffset .7s ease"/>
+      </svg>
+      <div class="txt"><b id="ringNum">0/0</b><span>已完成</span></div>
+    </div>
+    <div class="hero-info">
+      <div class="title" id="heroTitle">今日进度</div>
+      <div class="bar"><i id="heroBar" style="width:0%"></i></div>
+      <div class="hint" id="heroHint">☀️ 新的一天，加油鸭！</div>
+    </div>
+    <div class="coin"><div class="face">🐷</div><b id="daySum">¥0</b><span>今日收获</span></div>
+  </div>
+
+  <div class="sect done" id="sectDone">
+    <div class="sect-head"><span class="tag">✅</span> 我做完啦！ <span class="cnt" id="cntDone">0 项</span></div>
+    <div class="list" id="listDone"></div>
+  </div>
+
+  <div class="sect todo" id="sectTodo">
+    <div class="sect-head"><span class="tag">🌱</span> 还没有完成哦 <span class="cnt" id="cntTodo">0 项</span></div>
+    <div class="list" id="listTodo"></div>
+  </div>
+
+  <div class="foot">
+    <div class="readonly-note">🔍 本页是小朋友的「观看模式」<br>不能打卡、不能修改，完成情况以爸爸妈妈的打卡页面为准</div>
+    <div class="sync" id="syncLine">☁️ 正在读取数据…</div>
+    <footer class="credit">🌟 坚持每天的小任务，零花钱小猪会越来越重哦 🐷💰</footer>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* =====================================================================
+   儿童只读端 —— 与《家务零花钱打卡》(index.html) 共用同一数据源：
+   ① 同浏览器/设备：直接读父页面的 localStorage key "chore-app-data"
+      （parent 页面一改动，本页经 storage 事件即时刷新，零延迟一致）
+   ② 跨设备：只读拉取同一云端 Gist（chore-data.json），缓存在 "chore-child-cache"，
+      与本地数据做并集合并展示（合并算法与父页面 mergeStates 一致）。
+   任务目录与父页面一样以内置 DEFAULT_TASKS 为准（source of truth）。
+   本页没有任何写操作 —— 不会修改 Gist，也不会写 "chore-app-data"。
+   ===================================================================== */
+
+/* ---------- 任务目录（与 index.html 中 DEFAULT_TASKS 完全一致） ---------- */
+const DEFAULT_TASKS = [
+  {id:"t01", group:"🌅 晨间", name:"按时起床、叠好被子", amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t02", group:"🌅 晨间", name:"整理床铺",           amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t03", group:"🌅 晨间", name:"吃早餐（不催促）",   amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t04", group:"🌅 晨间", name:"准备当天上学用品",   amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t05", group:"🏠 家务", name:"摆碗筷、收拾餐桌",   amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t06", group:"🏠 家务", name:"扫地/拖地（自己房间）", amount:1, amountText:"+1元",  weekendOnly:false},
+  {id:"t07", group:"🏠 家务", name:"倒垃圾（分类）",     amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t08", group:"🏠 家务", name:"擦桌子/擦窗台/卫生间/洗手台", amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t09", group:"🏠 家务", name:"整理玩具/书籍",      amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t10", group:"🏠 家务", name:"周末：洗菜/择菜/洗袜子/折叠衣服等", amount:1, amountText:"+1~3元", weekendOnly:true},
+  {id:"t11", group:"📚 学习", name:"按时完成作业（无催促）", amount:2, amountText:"+2元", weekendOnly:false},
+  {id:"t12", group:"📚 学习", name:"主动复习/预习",      amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t13", group:"📚 学习", name:"课外阅读30分钟",     amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t14", group:"📚 学习", name:"练字/书法练习",      amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t15", group:"📚 学习", name:"完成额外练习题",     amount:1,   amountText:"+1元/套", weekendOnly:false},
+  {id:"t16", group:"📚 学习", name:"整理书包/学习资料",  amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t17", group:"📚 学习", name:"背单词/古诗词（10个）", amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t18", group:"🏃 运动", name:"跳绳100下",          amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t19", group:"🏃 运动", name:"跑步/慢跑800米",     amount:1.5, amountText:"+1.5元", weekendOnly:false},
+  {id:"t20", group:"🏃 运动", name:"仰卧起坐30个",       amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t21", group:"🏃 运动", name:"坐位体前屈练习（10分钟）", amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t22", group:"🏃 运动", name:"立定跳远练习（10M）", amount:0.5, amountText:"+0.5元", weekendOnly:false},
+  {id:"t23", group:"🏃 运动", name:"开合跳/高抬腿（5M）", amount:1,   amountText:"+1元",   weekendOnly:false},
+  {id:"t24", group:"🏃 运动", name:"球类运动（篮球/足球/乒乓球等）10M", amount:1.5, amountText:"+1.5元", weekendOnly:false},
+];
+const GROUP_FACE = {"🌅 晨间":"⏰","🏠 家务":"🧹","📚 学习":"📖","🏃 运动":"⚽"};
+
+/* ---------- 工具 ---------- */
+const WEEK_CN = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
+const WEEK_SHORT = ["日","一","二","三","四","五","六"];
+function pad(n){return n<10?"0"+n:""+n}
+function dkey(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
+function isWeekend(d){const w=d.getDay();return w===0||w===6}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}
+function money(x){const r=Math.round(x*100)/100;return "¥"+(Number.isInteger(r)?r:r.toFixed(r*10%10?2:1))}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+
+/* ---------- 数据源读取（只读） ---------- */
+const LS_DATA  = "chore-app-data";    // 父页面的本机数据（同源共享 → 即时一致）
+const LS_CACHE = "chore-child-cache"; // 云端拉到的数据在本页的只读缓存
+const LS_SYNC  = "chore-sync-cfg";    // 云同步配置（与父页面共用同一份）
+const SYNC_DEFAULT = { gistId:"b96c91c9966987c90871a9dfb59520d9", file:"chore-data.json" };
+
+function readJson(key){ try{ const o=JSON.parse(localStorage.getItem(key)||"null"); return (o && o.version===1)?o:null; }catch(e){ return null; } }
+function tsOf(s){ return s && s.updatedAt ? (Date.parse(s.updatedAt)||0) : 0; }
+
+/* 并集合并（records 逐日逐任务、expenses 按日取较新侧）—— 与父页面 mergeStates 同规则 */
+function mergeTwo(a,ua,b,ub){
+  const older = ua>=ub ? b : a, newer = ua>=ub ? a : b;
+  const nu = Math.max(ua,ub);
+  const out = Object.assign({}, newer, {records:{}, expenses:{}});
+  const recs = {};
+  const allDates = new Set([...Object.keys(older?.records||{}), ...Object.keys(newer?.records||{})]);
+  for(const dk of allDates){
+    const o=(older?.records||{})[dk]||{}, n=(newer?.records||{})[dk]||{};
+    const day={};
+    for(const tid of new Set([...Object.keys(o),...Object.keys(n)])){
+      if(n[tid]&&n[tid].done) day[tid]=n[tid];                    // 较新侧已打卡 → 保留
+      else if(o[tid]&&o[tid].done && !(tid in n)) day[tid]=o[tid]; // 较新侧完全没这条 → 保留旧数据
+    }
+    if(Object.keys(day).length) recs[dk]=day;
+  }
+  out.records=recs;
+  out.expenses=Object.assign({}, older?.expenses||{}, newer?.expenses||{});
+  out.updatedAt = newer?.updatedAt || (nu?new Date(nu).toISOString():null);
+  return out;
+}
+function currentTasks(){ return DEFAULT_TASKS; }
+let state = collectState();
+function collectState(){
+  const local = readJson(LS_DATA), cache = readJson(LS_CACHE);
+  if(local && cache) return mergeTwo(local,tsOf(local),cache,tsOf(cache));
+  return local || cache || {version:1, childName:"孩子", records:{}, expenses:{}};
+}
+
+/* ---------- 云端只读拉取（有 token 才启用；绝不推送） ---------- */
+function syncCfg(){
+  let o={}; try{ o=JSON.parse(localStorage.getItem(LS_SYNC)||"{}"); }catch(e){}
+  const token = (o.token!=null && o.token!=="") ? o.token : "";
+  return { gistId:o.gistId||SYNC_DEFAULT.gistId, token, apiBase:o.apiBase||"https://api.github.com", disabled:!!o.disabled };
+}
+async function pullCloud(){
+  const c = syncCfg();
+  const setLine=(t)=>{ const el=document.getElementById("syncLine"); if(el) el.innerHTML=t; };
+  if(!c.gistId || !c.token || c.disabled){ setLine("📱 本机数据（未配置云端，若与爸爸妈妈共用手机可直接看到最新）· <button id=\"btnCfg\">☁️ 配置云端</button>"); bindCfg(); return; }
+  setLine("☁️ 同步中…");
+  try{
+    const r = await fetch(`${c.apiBase}/gists/${c.gistId}`,{headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json"}});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const j = await r.json();
+    const f = j.files && j.files[SYNC_DEFAULT.file];
+    if(!f) throw new Error("云端缺少数据文件");
+    const remote = JSON.parse(f.content);
+    remote.updatedAt = remote.updatedAt || j.updated_at || null;
+    const prev = readJson(LS_CACHE);
+    const merged = prev ? mergeTwo(remote,tsOf(remote),prev,tsOf(prev)) : remote;
+    localStorage.setItem(LS_CACHE, JSON.stringify(merged));   // 只写本页自己的缓存 key
+    state = collectState();
+    render();
+    setLine("☁️ 已同步云端 · "+fmtT(new Date().toISOString())+" <button id=\"btnSync\">刷新</button>");
+    bindSync();
+  }catch(e){
+    setLine((e.status===401||e.message.includes("401")||e.message.includes("403")||e.message.includes("404")?"☁️ 云端连接失败（token 可能过期）":"☁️ 云端连不上，展示本机数据")+" · <button id=\"btnSync\">重试</button>");
+    bindSync();
+  }
+}
+function fmtT(iso){ if(!iso)return"—"; const d=new Date(iso); return `${d.getMonth()+1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function bindSync(){ const b=document.getElementById("btnSync"); if(b)b.onclick=pullCloud; }
+function bindCfg(){ const b=document.getElementById("btnCfg"); if(b)b.onclick=openCfg; }
+function openCfg(){
+  const v = prompt("粘贴爸爸妈妈给的配置 token（github_pat_ 开头，仅存本机）：","");
+  if(v && /^(github_pat_|gh[pousr])/.test(v.trim())){
+    let o={}; try{o=JSON.parse(localStorage.getItem(LS_SYNC)||"{}")}catch(e){}
+    localStorage.setItem(LS_SYNC, JSON.stringify({...o, token:v.trim(), disabled:false}));
+    pullCloud();
+  }
+}
+/* URL 片段携带 token（与父页面配置链接格式一致：#token=...）*/
+(function hashBootstrap(){
+  const h=decodeURIComponent(location.hash||""), m=h.match(/token=([A-Za-z0-9_\-\.]+)/);
+  if(m && /^(github_pat_|gh[pousr])/.test(m[1])){
+    let o={}; try{o=JSON.parse(localStorage.getItem(LS_SYNC)||"{}")}catch(e){}
+    localStorage.setItem(LS_SYNC, JSON.stringify({...o, token:m[1], disabled:false}));
+    try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}
+  }
+})();
+
+/* ---------- 视图状态 ---------- */
+let cursor = new Date(); cursor.setHours(0,0,0,0);
+
+/* ---------- 渲染 ---------- */
+function render(){
+  document.getElementById("childName").textContent = state.childName || "孩子";
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dk = dkey(cursor);
+  const we = isWeekend(cursor);
+  const isToday = dkey(cursor)===dkey(today);
+  const isFuture = cursor > today;
+
+  document.getElementById("dLabel").textContent =
+    `${cursor.getFullYear()}年${cursor.getMonth()+1}月${cursor.getDate()}日 · ${WEEK_CN[cursor.getDay()]}${we?" 🎈":""}`;
+  document.getElementById("dSub").innerHTML = isToday ? `<span class="badge">今天</span>`
+    : isFuture ? "🚀 这天还没到哦" : "📖 过去的记录";
+
+  const rec = (state.records||{})[dk] || {};
+  const tasks = currentTasks();
+  const doneList=[], todoList=[];
+  let inc=0;
+  for(const t of tasks){
+    if(t.weekendOnly && !we) continue;          // 仅周末任务：非周末不出现（与父页面计数口径一致）
+    const on = rec[t.id] && rec[t.id].done;
+    if(on){ doneList.push({t, amt:rec[t.id].amount||t.amount}); inc += rec[t.id].amount||t.amount; }
+    else todoList.push(t);
+  }
+  const total = doneList.length + todoList.length;
+  inc = Math.round(inc*100)/100;
+
+  /* 进度 */
+  const pct = total? doneList.length/total : 0;
+  const C=2*Math.PI*38;
+  const arc=document.getElementById("ringArc");
+  arc.setAttribute("stroke-dashoffset", (C*(1-pct)).toFixed(1));
+  arc.setAttribute("stroke", pct>=1?"#34b34a":"#7ed957");
+  document.getElementById("ringNum").textContent = `${doneList.length}/${total}`;
+  document.getElementById("heroBar").style.width = Math.round(pct*100)+"%";
+  document.getElementById("heroTitle").textContent = isFuture ? "敬请期待" : isToday ? "今日进度" : "当天进度";
+  const hints = isFuture ? "🔮 到了这天，任务会自己跳出来！"
+    : pct>=1 && total>0 ? "🏆 全部完成！今天的你已经超级棒了！"
+    : pct>=0.6 ? "💪 已经完成一大半啦，冲呀！"
+    : doneList.length>0 ? "🌟 开了个好头，继续加油！"
+    : "☀️ 新的一天，从第一个小任务开始吧！";
+  document.getElementById("heroHint").textContent = hints;
+  document.getElementById("daySum").textContent = isFuture ? "—" : money(inc);
+  document.getElementById("cheer").className = "cheer" + ((pct>=1&&total>0&&!isToday)? " show":(pct>=1&&total>0&&isToday? " show":""));
+
+  /* 列表 */
+  document.getElementById("cntDone").textContent = doneList.length+" 项";
+  document.getElementById("cntTodo").textContent = todoList.length+" 项";
+  document.getElementById("listDone").innerHTML = doneList.length
+    ? doneList.map(({t,amt})=>`<div class="card">
+        <span class="face">${GROUP_FACE[t.group]||"⭐"}</span>
+        <span class="nm">${escapeHtml(t.name)}${t.weekendOnly?'<span class="wechip">仅周末</span>':''}<small>${t.group}</small></span>
+        <span class="amt">✓ ${money(amt)}</span></div>`).join("")
+    : `<div class="empty"><span class="face">🐣</span>${isFuture?"这天还没到，还没有任务哦":"还没有完成的任务，快去叫爸爸妈妈打卡吧！"}</div>`;
+  document.getElementById("listTodo").innerHTML = todoList.length
+    ? todoList.map(t=>`<div class="card">
+        <span class="face">${GROUP_FACE[t.group]||"⭐"}</span>
+        <span class="nm">${escapeHtml(t.name)}${t.weekendOnly?'<span class="wechip">仅周末</span>':''}<small>${t.group}</small></span>
+        <span class="amt">${isFuture?"":t.amountText}</span></div>`).join("")
+    : `<div class="empty"><span class="face">🎉</span>今天的任务全部完成，没有剩余啦！</div>`;
+}
+
+/* ---------- 交互（仅翻日期，不可修改任何数据） ---------- */
+document.getElementById("navPrev").addEventListener("click",()=>{cursor=addDays(cursor,-1);render()});
+document.getElementById("navNext").addEventListener("click",()=>{cursor=addDays(cursor,1);render()});
+document.getElementById("navToday").addEventListener("click",()=>{cursor=new Date();cursor.setHours(0,0,0,0);render()});
+
+/* ---------- 实时刷新：同设备即时一致 + 定时轮询云端 ---------- */
+window.addEventListener("storage",e=>{        // 父页面在同一浏览器改动 → 瞬间刷新
+  if(e.key===LS_DATA || e.key===LS_CACHE){ state=collectState(); render(); }
+});
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) pullCloud(); });
+render();
+pullCloud();
+setInterval(pullCloud, 30000);
+</script>
+</body>
+</html>

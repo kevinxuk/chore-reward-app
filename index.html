@@ -198,6 +198,7 @@ footer{max-width:1200px;margin:0 auto;padding:6px 16px 20px;font-size:.7rem;colo
     </div>
   </div>
   <div class="hd-tools">
+    <button id="btnChild" title="打开孩子的只读观看页">🧒 儿童端</button>
     <button id="btnExport">📤 导出 JSON</button>
     <button id="btnImport">📥 导入 JSON</button>
     <button id="btnBind" style="display:none">🔗 绑定数据文件</button>
@@ -979,6 +980,7 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":
   }
 })();
 $("#cloudBtn").addEventListener("click", cloudBtnClick);
+$("#btnChild").addEventListener("click", ()=>{ location.href = location.protocol==="file:" ? "儿童端打卡一览.html" : "child.html"; });
 render();
 bootSync();
 </script>
