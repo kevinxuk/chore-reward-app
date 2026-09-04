@@ -3,20 +3,21 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>🌈 我的打卡小天地</title>
+<title>🍡 YOYO 的打卡小天地</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#BDE8FF">
+<meta name="theme-color" content="#FFE3EC">
 <style>
-/* ============ 卡通风格儿童端（只读） ============ */
+/* ============ YOYO 卡通风格 · 儿童端（只读） ============ */
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{font-size:16px}
-body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;color:#3a3a3a;min-height:100vh;
-  background:linear-gradient(180deg,#bfe6ff 0%,#d9f0ff 34%,#fff3d6 78%,#ffe7ec 100%);
+body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;color:#4a4453;min-height:100vh;
+  background:linear-gradient(180deg,#ffe3ec 0%,#fff3e6 38%,#eefaf1 75%,#e8f4ff 100%);
   background-attachment:fixed;overflow-x:hidden;padding-bottom:40px}
 button{font-family:inherit;cursor:pointer;border:0;background:none}
+.mascot{display:inline-block;vertical-align:middle}
 
-/* 漂浮的云朵与星星（纯装饰） */
-.deco{position:fixed;z-index:0;pointer-events:none;user-select:none;font-size:2rem;opacity:.85;
+/* 漂浮装饰 */
+.deco{position:fixed;z-index:0;pointer-events:none;user-select:none;font-size:2rem;opacity:.8;
   animation:floaty 7s ease-in-out infinite}
 .deco.d2{font-size:1.5rem;animation-duration:9s;animation-delay:-3s}
 .deco.d3{font-size:1.2rem;animation-duration:6s;animation-delay:-1.5s}
@@ -27,26 +28,39 @@ button{font-family:inherit;cursor:pointer;border:0;background:none}
 
 /* ============ 顶栏 ============ */
 header{text-align:center;padding:10px 0 4px}
-.logo{display:inline-flex;align-items:center;gap:8px;background:#fff;border:3px solid #ffd166;border-radius:999px;
-  padding:8px 20px;font-size:1.15rem;font-weight:900;box-shadow:0 4px 0 #ffd166;color:#b06f13}
-.logo .name{color:#2f8fd8;border-bottom:3px dotted #9fd4ff;line-height:1.15}
-.sub{margin-top:6px;font-size:.78rem;color:#8b8b8b}
+.logo{display:inline-flex;align-items:center;gap:10px;background:#fff;border:3px solid #ffc9d8;border-radius:999px;
+  padding:6px 20px 6px 8px;font-size:1.12rem;font-weight:900;box-shadow:0 4px 0 #ffc9d8;color:#d8607f}
+.logo .name{color:#2f8fd8;border-bottom:3px dotted #a8d5ff;line-height:1.15}
+.logo .mascot{width:46px;height:46px;flex:none}
+.sub{margin-top:6px;font-size:.78rem;color:#a29bb0}
+
+/* ============ 金额总计（顶部） ============ */
+.total{background:linear-gradient(135deg,#fff6e8,#ffe9f0);border:3px solid #ffcf7a;border-radius:26px;
+  box-shadow:0 6px 0 #ffcf7a;padding:14px 16px;margin:14px 0;display:flex;align-items:center;gap:12px}
+.total .mascot{width:62px;height:62px;flex:none}
+.total .mascot .coin-spin{animation:coinspin 3.2s ease-in-out infinite}
+@keyframes coinspin{0%,100%{transform:rotate(0)}50%{transform:rotate(18deg)}}
+.total .t-info{flex:1}
+.total .t-k{font-size:.8rem;color:#c08a3e;font-weight:700}
+.total .t-v{font-size:2rem;font-weight:900;color:#e07b00;line-height:1.15}
+.total .t-sub{font-size:.72rem;color:#c9a06a;margin-top:2px}
+.total .t-sub b{color:#1e8449}.total .t-sub i{font-style:normal;color:#e07b00;font-weight:700}
 
 /* ============ 日期条 ============ */
-.datebar{display:flex;align-items:center;gap:8px;background:#fff;border:3px solid #c9e8ff;border-radius:22px;
-  box-shadow:0 5px 0 #c9e8ff;padding:10px 12px;margin:14px 0}
-.datebar button{width:44px;height:44px;border-radius:50%;background:#eaf6ff;font-size:1.3rem;font-weight:900;color:#2f8fd8;
-  box-shadow:0 3px 0 #bde0fa;line-height:1}
+.datebar{display:flex;align-items:center;gap:8px;background:#fff;border:3px solid #ffd7e3;border-radius:22px;
+  box-shadow:0 5px 0 #ffd7e3;padding:10px 12px;margin-bottom:14px}
+.datebar button{width:44px;height:44px;border-radius:50%;background:#ffeff4;font-size:1.3rem;font-weight:900;color:#e086a5;
+  box-shadow:0 3px 0 #ffd0de;line-height:1}
 .datebar button:active{transform:translateY(2px);box-shadow:none}
 .date-mid{flex:1;text-align:center}
 .date-mid .d1{font-size:1.15rem;font-weight:900}
-.date-mid .d2{font-size:.8rem;color:#9a9a9a;margin-top:2px}
+.date-mid .d2{font-size:.8rem;color:#a29bb0;margin-top:2px}
 .today-btn{width:auto!important;border-radius:999px!important;padding:0 14px;font-size:.85rem!important}
 .badge{display:inline-block;background:#ffe9a8;color:#9a6b00;border-radius:999px;padding:1px 10px;font-size:.72rem;font-weight:700;vertical-align:2px}
 
-/* ============ 进度大卡片 ============ */
-.hero{display:flex;align-items:center;gap:14px;background:#fff;border:3px solid #ffd166;border-radius:26px;
-  box-shadow:0 6px 0 #ffd166;padding:16px;margin-bottom:14px}
+/* ============ 进度卡片 ============ */
+.hero{display:flex;align-items:center;gap:14px;background:#fff;border:3px solid #b7e6c4;border-radius:26px;
+  box-shadow:0 6px 0 #b7e6c4;padding:16px;margin-bottom:14px}
 .ring{position:relative;width:92px;height:92px;flex:none}
 .ring svg{transform:rotate(-90deg)}
 .ring .txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.1}
@@ -54,14 +68,14 @@ header{text-align:center;padding:10px 0 4px}
 .ring .txt span{font-size:.66rem;color:#999}
 .hero-info{flex:1}
 .hero-info .title{font-size:1rem;font-weight:900;margin-bottom:6px}
-.bar{height:16px;background:#f1f1f1;border-radius:999px;overflow:hidden;border:2px solid #e2e2e2}
-.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#7ed957,#34b34a);transition:width .6s ease}
-.hero-info .hint{font-size:.8rem;color:#8b8b8b;margin-top:8px}
+.bar{height:16px;background:#f1eef5;border-radius:999px;overflow:hidden;border:2px solid #e6e0ee}
+.bar i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#9ad97e,#34b34a);transition:width .6s ease}
+.hero-info .hint{font-size:.8rem;color:#a29bb0;margin-top:8px}
 .coin{text-align:center;flex:none}
-.coin .face{font-size:2rem;animation:wob 2.4s ease-in-out infinite}
-@keyframes wob{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}}
-.coin b{display:block;font-size:1.25rem;color:#e07b00}
-.coin span{font-size:.68rem;color:#c9a06a}
+.coin .mascot{width:64px;height:64px;animation:wob 2.6s ease-in-out infinite}
+@keyframes wob{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+.coin b{display:block;font-size:1.15rem;color:#1e8449}
+.coin span{font-size:.68rem;color:#8fbf9c}
 
 /* ============ 任务列表 ============ */
 .sect{margin-bottom:16px}
@@ -75,60 +89,68 @@ header{text-align:center;padding:10px 0 4px}
 .card .face{font-size:1.7rem;flex:none;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
   background:#f2fbff;border-radius:50%}
 .card .nm{flex:1;font-size:.95rem;font-weight:700;line-height:1.3}
-.card .nm small{display:block;font-weight:400;font-size:.7rem;color:#a5a5a5;margin-top:2px}
+.card .nm small{display:block;font-weight:400;font-size:.7rem;color:#b3adbd;margin-top:2px}
 .card .amt{flex:none;font-weight:900;font-size:.95rem}
 /* 已完成 */
-.sect.done .card{border-color:#bdebcb;box-shadow:0 4px 0 #bdebcb;background:#f4fff2}
+.sect.done .card{border-color:#bdebcb;box-shadow:0 4px 0 #bdebcb;background:#f6fff3}
 .sect.done .card .amt{color:#1e8449}
 .sect.done .face{background:#e3f8dc;animation:pop .5s ease}
 @keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
-.sect.done .card .ck{font-size:1.1rem}
 /* 未完成 */
-.sect.todo .card{border-color:#ffe3b3;box-shadow:0 4px 0 #ffe3b3;background:#fffdf6}
+.sect.todo .card{border-color:#ffd9b8;box-shadow:0 4px 0 #ffd9b8;background:#fffaf2}
 .sect.todo .card .amt{color:#d99a26;font-size:.8rem;font-weight:700}
-.sect.todo .face{background:#fff3dc;filter:grayscale(.15)}
-.sect.todo .card .ck{font-size:1.1rem}
+.sect.todo .face{background:#fff0dd;filter:grayscale(.15)}
 .sect-head .tag{font-size:1.2rem}
-.empty{background:#fff;border:3px dashed #d5d5d5;border-radius:20px;padding:22px 14px;text-align:center;color:#9a9a9a;font-size:.88rem}
-.empty .face{font-size:2.2rem;display:block;margin-bottom:6px}
+.empty{background:#fff;border:3px dashed #e3dceb;border-radius:20px;padding:18px 14px;text-align:center;color:#a29bb0;font-size:.88rem}
+.empty .mascot{width:84px;height:84px;display:block;margin:0 auto 4px}
 
 /* 周末任务小标 */
 .wechip{display:inline-block;background:#ffe1e6;color:#d05a6e;border-radius:999px;padding:1px 8px;font-size:.66rem;font-weight:700;margin-left:6px;vertical-align:2px}
 
 /* ============ 底部 ============ */
 .foot{margin-top:18px;text-align:center}
-.readonly-note{display:inline-block;background:#eaf4ff;border:2px dashed #a9cdf5;color:#4a7fb5;border-radius:16px;
+.readonly-note{display:inline-block;background:#f3ecff;border:2px dashed #cdb6f0;color:#8a63c9;border-radius:16px;
   padding:10px 18px;font-size:.82rem;line-height:1.6}
-.sync{margin-top:10px;font-size:.72rem;color:#9db6cc}
+.sync{margin-top:10px;font-size:.72rem;color:#a5b8cc}
 .sync button{font-size:.72rem;color:#2f8fd8;text-decoration:underline;padding:0 2px}
-footer.credit{margin-top:14px;font-size:.68rem;color:#b6a58c}
+footer.credit{margin-top:14px;font-size:.68rem;color:#d0a9b8}
 
-/* 全部完成的庆祝横幅 */
+/* 庆祝横幅 */
 .cheer{display:none;background:linear-gradient(135deg,#fff6d8,#ffe7ec);border:3px solid #ffd166;border-radius:22px;
   box-shadow:0 5px 0 #ffd166;padding:14px;text-align:center;margin-bottom:14px;font-weight:900;color:#b06f13;font-size:1.05rem}
-.cheer.show{display:block;animation:pop .5s ease}
-.cheer .faces{font-size:1.6rem;letter-spacing:6px}
+.cheer.show{display:block}
+.cheer .mascot{width:76px;height:76px;vertical-align:middle}
+.cheer .faces{font-size:1.4rem;letter-spacing:6px;vertical-align:middle}
 
 @media (max-width:420px){
   html{font-size:15px}
-  .hero{flex-wrap:wrap}
-  .coin{width:100%;display:flex;justify-content:center;gap:10px;align-items:center}
-  .coin .face{font-size:1.6rem}
+  .total .mascot{width:52px;height:52px}
+  .total .t-v{font-size:1.6rem}
 }
 </style>
 </head>
 <body>
-<span class="deco"    style="top:6%;left:6%">☁️</span>
+<span class="deco"    style="top:6%;left:6%">🍑</span>
 <span class="deco d2" style="top:12%;right:8%">⭐</span>
-<span class="deco d3" style="top:40%;left:3%">🎈</span>
-<span class="deco d4" style="top:55%;right:4%">☁️</span>
+<span class="deco d3" style="top:40%;left:3%">🎀</span>
+<span class="deco d4" style="top:55%;right:4%">🍑</span>
 <span class="deco d2" style="top:78%;left:10%">🌟</span>
 
 <div class="wrap">
   <header>
-    <div class="logo">🌈 <span class="name" id="childName">孩子</span> 的打卡小天地</div>
+    <div class="logo"><span class="mascot" id="mLogo"></span> <span class="name" id="childName">孩子</span> 的打卡小天地</div>
     <div class="sub">这里只能看哦 · 每完成一项就会跳进上面的列表 🎪</div>
   </header>
+
+  <!-- 金额总计 -->
+  <div class="total">
+    <span class="mascot" id="mTotal"></span>
+    <div class="t-info">
+      <div class="t-k">🍑 YOYO 帮你攒下的零花钱 · 金额总计</div>
+      <div class="t-v" id="totalBalance">¥0</div>
+      <div class="t-sub">累计赚了 <b id="totalIncome">¥0</b> · 已经花了 <i id="totalExpense">¥0</i></div>
+    </div>
+  </div>
 
   <div class="datebar">
     <button id="navPrev" title="前一天">‹</button>
@@ -140,7 +162,7 @@ footer.credit{margin-top:14px;font-size:.68rem;color:#b6a58c}
     <button class="today-btn" id="navToday">🏠 今天</button>
   </div>
 
-  <div class="cheer" id="cheer"><span class="faces">🎉🥳🎊</span><br>哇！今天的任务全部完成，太厉害啦！</div>
+  <div class="cheer" id="cheer"><span class="mascot" id="mCheer"></span><span class="faces">🎉🥳🎊</span><br>哇！今天的任务全部完成，太厉害啦！</div>
 
   <div class="hero">
     <div class="ring">
@@ -156,7 +178,7 @@ footer.credit{margin-top:14px;font-size:.68rem;color:#b6a58c}
       <div class="bar"><i id="heroBar" style="width:0%"></i></div>
       <div class="hint" id="heroHint">☀️ 新的一天，加油鸭！</div>
     </div>
-    <div class="coin"><div class="face">🐷</div><b id="daySum">¥0</b><span>今日收获</span></div>
+    <div class="coin"><span class="mascot" id="mCoin"></span><b id="daySum">¥0</b><span>今日收获</span></div>
   </div>
 
   <div class="sect done" id="sectDone">
@@ -172,7 +194,7 @@ footer.credit{margin-top:14px;font-size:.68rem;color:#b6a58c}
   <div class="foot">
     <div class="readonly-note">🔍 本页是小朋友的「观看模式」<br>不能打卡、不能修改，完成情况以爸爸妈妈的打卡页面为准</div>
     <div class="sync" id="syncLine">☁️ 正在读取数据…</div>
-    <footer class="credit">🌟 坚持每天的小任务，零花钱小猪会越来越重哦 🐷💰</footer>
+    <footer class="credit">🍡 坚持每天的小任务，YOYO 的小金库会越来越满哦 💰</footer>
   </div>
 </div>
 
@@ -217,9 +239,70 @@ const DEFAULT_TASKS = [
 ];
 const GROUP_FACE = {"🌅 晨间":"⏰","🏠 家务":"🧹","📚 学习":"📖","🏃 运动":"⚽"};
 
+/* ---------- YOYO 吉祥物（原创手绘 SVG，软萌白色团子风） ----------
+   mood: happy(笑) / wink(眨眼) / cheer(举手庆祝) / sleep(睡觉) / wave(挥手)
+   prop: coin=true 抱金币；check=true 举对勾 */
+function yoyo(mood, opt){
+  opt = opt || {};
+  const uid = "yy"+Math.random().toString(36).slice(2,7);
+  // 五官
+  let eyes, mouth;
+  if(mood==="sleep"){ eyes=`<path d="M41 47 q4 3 8 0" stroke="#5b4a52" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+      <path d="M63 47 q4 3 8 0" stroke="#5b4a52" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    mouth=`<circle cx="55" cy="56" r="2.4" fill="#e88aa4"/>`; }
+  else if(mood==="wink"){ eyes=`<path d="M41 46 q5 -6 10 0" stroke="#5b4a52" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+      <circle cx="68" cy="45" r="3.4" fill="#5b4a52"/><circle cx="69.2" cy="43.8" r="1.1" fill="#fff"/>`;
+    mouth=`<path d="M49 53 q6 6 12 0" stroke="#5b4a52" stroke-width="2.6" fill="none" stroke-linecap="round"/>`; }
+  else if(mood==="cheer"){ eyes=`<path d="M41 46 q5 -6 10 0" stroke="#5b4a52" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+      <path d="M59 46 q5 -6 10 0" stroke="#5b4a52" stroke-width="2.8" fill="none" stroke-linecap="round"/>`;
+    mouth=`<path d="M48 52 q7 9 14 0 q-7 5 -14 0 z" fill="#d8607f"/>`; }
+  else { eyes=`<circle cx="46" cy="45" r="3.4" fill="#5b4a52"/><circle cx="64" cy="45" r="3.4" fill="#5b4a52"/>
+      <circle cx="47.2" cy="43.8" r="1.1" fill="#fff"/><circle cx="65.2" cy="43.8" r="1.1" fill="#fff"/>`;
+    mouth=`<path d="M50 53 q5 5 10 0" stroke="#5b4a52" stroke-width="2.6" fill="none" stroke-linecap="round"/>`; }
+  // 小手
+  let arms = "";
+  if(mood==="cheer"||mood==="wave"){
+    arms = mood==="wave"
+      ? `<ellipse cx="26" cy="78" rx="7.5" ry="6" fill="#fff" stroke="#f0d3da" stroke-width="2" transform="rotate(-30 26 78)"/>
+         <ellipse cx="84" cy="72" rx="7.5" ry="6" fill="#fff" stroke="#f0d3da" stroke-width="2" transform="rotate(40 84 72)"/>`
+      : `<ellipse cx="24" cy="70" rx="7" ry="6" fill="#fff" stroke="#f0d3da" stroke-width="2" transform="rotate(-55 24 70)"/>
+         <ellipse cx="86" cy="70" rx="7" ry="6" fill="#fff" stroke="#f0d3da" stroke-width="2" transform="rotate(55 86 70)"/>`;
+  } else {
+    arms = `<ellipse cx="27" cy="84" rx="7" ry="5.5" fill="#fff" stroke="#f0d3da" stroke-width="2" transform="rotate(-18 27 84)"/>
+            <ellipse cx="83" cy="84" rx="7" ry="5.5" fill="#fff" stroke="#f0d3da" stroke-width="2" transform="rotate(18 83 84)"/>`;
+  }
+  let extra = "";
+  if(opt.coin){
+    extra = `<g class="coin-spin"><circle cx="55" cy="92" r="11" fill="#ffd166" stroke="#e8a825" stroke-width="2.4"/>
+      <text x="55" y="96.5" text-anchor="middle" font-size="11" font-weight="900" fill="#a06a1a">¥</text></g>`;
+  }
+  if(opt.check){
+    extra = `<g transform="translate(80 58)"><circle r="10" fill="#7ed957" stroke="#4da32f" stroke-width="2"/>
+      <path d="M-4.5 0.5 l3.2 3.4 l6 -7" stroke="#fff" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+  }
+  if(mood==="sleep"){ extra += `<text x="82" y="26" font-size="11" font-weight="900" fill="#b39ac9">z</text>
+      <text x="90" y="16" font-size="8" font-weight="900" fill="#cbb8de">z</text>`; }
+  const blush = `<ellipse cx="38" cy="51" rx="5" ry="3.2" fill="#ffb8c9" opacity=".85"/>
+                 <ellipse cx="72" cy="51" rx="5" ry="3.2" fill="#ffb8c9" opacity=".85"/>`;
+  return `<svg viewBox="0 0 110 112" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs><radialGradient id="${uid}" cx="50%" cy="36%" r="70%">
+      <stop offset="0%" stop-color="#ffffff"/><stop offset="80%" stop-color="#fff6f8"/><stop offset="100%" stop-color="#ffeef2"/>
+    </radialGradient></defs>
+    <!-- 耳朵（小圆耳） -->
+    <circle cx="38" cy="20" r="9" fill="url(#${uid})" stroke="#f0d3da" stroke-width="2.4"/>
+    <circle cx="72" cy="20" r="9" fill="url(#${uid})" stroke="#f0d3da" stroke-width="2.4"/>
+    <circle cx="38" cy="20" r="4" fill="#ffd3de"/>
+    <circle cx="72" cy="20" r="4" fill="#ffd3de"/>
+    <!-- 头顶呆毛 -->
+    <path d="M55 12 q3 -8 8 -6 q-3 4 -5 7" fill="#f6dee5"/>
+    <!-- 圆滚滚身体 -->
+    <ellipse cx="55" cy="62" rx="38" ry="36" fill="url(#${uid})" stroke="#f0d3da" stroke-width="2.6"/>
+    ${arms}${blush}${eyes}${mouth}${extra}
+  </svg>`;
+}
+
 /* ---------- 工具 ---------- */
 const WEEK_CN = ["星期日","星期一","星期二","星期三","星期四","星期五","星期六"];
-const WEEK_SHORT = ["日","一","二","三","四","五","六"];
 function pad(n){return n<10?"0"+n:""+n}
 function dkey(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())}
 function isWeekend(d){const w=d.getDay();return w===0||w===6}
@@ -265,6 +348,10 @@ function collectState(){
   return local || cache || {version:1, childName:"孩子", records:{}, expenses:{}};
 }
 
+/* 金额总计（口径与父页面一致：结余 = 全部已记录收入 − 全部已记录支出） */
+function allIncome(){ let s=0; for(const dk in (state.records||{})) { const r=state.records[dk]; for(const tid in r){ const v=r[tid]; if(v&&v.done) s+=v.amount||0; } } return Math.round(s*100)/100; }
+function allExpense(){ let s=0; for(const dk in (state.expenses||{})){ const l=state.expenses[dk]; if(Array.isArray(l)) for(const e of l) s+=e.amount||0; } return Math.round(s*100)/100; }
+
 /* ---------- 云端只读拉取（有 token 才启用；绝不推送） ---------- */
 function syncCfg(){
   let o={}; try{ o=JSON.parse(localStorage.getItem(LS_SYNC)||"{}"); }catch(e){}
@@ -292,7 +379,7 @@ async function pullCloud(){
     setLine("☁️ 已同步云端 · "+fmtT(new Date().toISOString())+" <button id=\"btnSync\">刷新</button>");
     bindSync();
   }catch(e){
-    setLine((e.status===401||e.message.includes("401")||e.message.includes("403")||e.message.includes("404")?"☁️ 云端连接失败（token 可能过期）":"☁️ 云端连不上，展示本机数据")+" · <button id=\"btnSync\">重试</button>");
+    setLine((e.message.includes("401")||e.message.includes("403")||e.message.includes("404")?"☁️ 云端连接失败（token 可能过期）":"☁️ 云端连不上，展示本机数据")+" · <button id=\"btnSync\">重试</button>");
     bindSync();
   }
 }
@@ -319,6 +406,10 @@ function openCfg(){
 
 /* ---------- 视图状态 ---------- */
 let cursor = new Date(); cursor.setHours(0,0,0,0);
+document.getElementById("mLogo").innerHTML  = yoyo("wink");
+document.getElementById("mTotal").innerHTML = yoyo("happy",{coin:true});
+document.getElementById("mCheer").innerHTML = yoyo("cheer");
+document.getElementById("mCoin").innerHTML  = yoyo("happy");
 
 /* ---------- 渲染 ---------- */
 function render(){
@@ -329,6 +420,12 @@ function render(){
   const isToday = dkey(cursor)===dkey(today);
   const isFuture = cursor > today;
 
+  /* 金额总计（顶部） */
+  const inc = allIncome(), exp = allExpense(), bal = Math.round((inc-exp)*100)/100;
+  document.getElementById("totalBalance").textContent = money(bal);
+  document.getElementById("totalIncome").textContent  = money(inc);
+  document.getElementById("totalExpense").textContent = money(exp);
+
   document.getElementById("dLabel").textContent =
     `${cursor.getFullYear()}年${cursor.getMonth()+1}月${cursor.getDate()}日 · ${WEEK_CN[cursor.getDay()]}${we?" 🎈":""}`;
   document.getElementById("dSub").innerHTML = isToday ? `<span class="badge">今天</span>`
@@ -337,15 +434,15 @@ function render(){
   const rec = (state.records||{})[dk] || {};
   const tasks = currentTasks();
   const doneList=[], todoList=[];
-  let inc=0;
+  let dayInc=0;
   for(const t of tasks){
     if(t.weekendOnly && !we) continue;          // 仅周末任务：非周末不出现（与父页面计数口径一致）
     const on = rec[t.id] && rec[t.id].done;
-    if(on){ doneList.push({t, amt:rec[t.id].amount||t.amount}); inc += rec[t.id].amount||t.amount; }
+    if(on){ doneList.push({t, amt:rec[t.id].amount||t.amount}); dayInc += rec[t.id].amount||t.amount; }
     else todoList.push(t);
   }
   const total = doneList.length + todoList.length;
-  inc = Math.round(inc*100)/100;
+  dayInc = Math.round(dayInc*100)/100;
 
   /* 进度 */
   const pct = total? doneList.length/total : 0;
@@ -362,8 +459,9 @@ function render(){
     : doneList.length>0 ? "🌟 开了个好头，继续加油！"
     : "☀️ 新的一天，从第一个小任务开始吧！";
   document.getElementById("heroHint").textContent = hints;
-  document.getElementById("daySum").textContent = isFuture ? "—" : money(inc);
-  document.getElementById("cheer").className = "cheer" + ((pct>=1&&total>0&&!isToday)? " show":(pct>=1&&total>0&&isToday? " show":""));
+  document.getElementById("daySum").textContent = isFuture ? "—" : money(dayInc);
+  document.getElementById("cheer").className = "cheer" + ((pct>=1&&total>0)? " show":"");
+  document.getElementById("mCoin").innerHTML = yoyo(pct>=1&&total>0&&!isFuture ? "cheer" : "happy");
 
   /* 列表 */
   document.getElementById("cntDone").textContent = doneList.length+" 项";
@@ -373,13 +471,13 @@ function render(){
         <span class="face">${GROUP_FACE[t.group]||"⭐"}</span>
         <span class="nm">${escapeHtml(t.name)}${t.weekendOnly?'<span class="wechip">仅周末</span>':''}<small>${t.group}</small></span>
         <span class="amt">✓ ${money(amt)}</span></div>`).join("")
-    : `<div class="empty"><span class="face">🐣</span>${isFuture?"这天还没到，还没有任务哦":"还没有完成的任务，快去叫爸爸妈妈打卡吧！"}</div>`;
+    : `<div class="empty"><span class="mascot">${yoyo(isFuture?"sleep":"wink")}</span><div>${isFuture?"这天还没到，还没有任务哦":"还没有完成的任务，快去叫爸爸妈妈打卡吧！"}</div></div>`;
   document.getElementById("listTodo").innerHTML = todoList.length
     ? todoList.map(t=>`<div class="card">
         <span class="face">${GROUP_FACE[t.group]||"⭐"}</span>
         <span class="nm">${escapeHtml(t.name)}${t.weekendOnly?'<span class="wechip">仅周末</span>':''}<small>${t.group}</small></span>
         <span class="amt">${isFuture?"":t.amountText}</span></div>`).join("")
-    : `<div class="empty"><span class="face">🎉</span>今天的任务全部完成，没有剩余啦！</div>`;
+    : `<div class="empty"><span class="mascot">${yoyo("cheer")}</span><div>今天的任务全部完成，没有剩余啦！</div></div>`;
 }
 
 /* ---------- 交互（仅翻日期，不可修改任何数据） ---------- */
