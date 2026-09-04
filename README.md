@@ -2,7 +2,7 @@
 
 孩子家务零花钱打卡表（2026年9月 v2）的单页网页版。无需安装、无外部依赖，打开即用。
 
-**在线地址：<https://kevinxuk.github.io/chore-reward-app/>** · **儿童只读端：<https://kevinxuk.github.io/chore-reward-app/child.html>**
+**在线地址：<https://kevinxuk.github.io/chore-reward-app/>** · **儿童只读端：<https://kevinxuk.github.io/chore-reward-app/child.html>** · **儿童端·真形象版：<https://kevinxuk.github.io/chore-reward-app/yoyo.html>**
 
 ## 功能
 
@@ -20,6 +20,7 @@
 - ✅「我做完啦！」与 🌱「还没有完成哦」两列清单，含进度环、今日收获与翻日期浏览；
 - **数据与本页完全同源**：同一浏览器打开时实时读取 `chore-app-data`（家长端一打卡，孩子端秒级刷新）；跨设备打开（可用配置链接 `child.html#token=…` 携带 token 或直接粘贴）则只读拉取同一个云端 Gist，绝不写回；
 - 周末专属任务仅在周六/周日显示，口径与家长端一致；全部完成时页面放 🎉。
+- **真形象版 `yoyo.html`**：同款功能，但把矢量小吉祥物换成实拍 YOYO 公仔抠图（rembg · alpha-matting 管线，透明 PNG base64 内联），配呼吸/点头/蹦跳等 CSS 动画与主题背景；`child.html`（SVG 版）保留不动，两版随时可切换。
 
 ## 使用提示
 
