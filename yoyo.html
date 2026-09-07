@@ -314,6 +314,13 @@ function mergeTwo(a,ua,b,ub){
   const older = ua>=ub ? b : a, newer = ua>=ub ? a : b;
   const nu = Math.max(ua,ub);
   const out = Object.assign({}, newer, {records:{}, expenses:{}});
+  // 确保 config 正确合并，优先取较新一侧的 tasks，若无则取较旧一侧
+  out.config = Object.assign({}, older?.config||{}, newer?.config||{});
+  if(newer?.config?.tasks && newer.config.tasks.length){
+    out.config.tasks = newer.config.tasks;
+  } else if(older?.config?.tasks && older.config.tasks.length){
+    out.config.tasks = older.config.tasks;
+  }
   const recs = {};
   const allDates = new Set([...Object.keys(older?.records||{}), ...Object.keys(newer?.records||{})]);
   for(const dk of allDates){
@@ -330,7 +337,20 @@ function mergeTwo(a,ua,b,ub){
   out.updatedAt = newer?.updatedAt || (nu?new Date(nu).toISOString():null);
   return out;
 }
-function currentTasks(){ return DEFAULT_TASKS; }
+function currentTasks(){
+  if(state && state.config && Array.isArray(state.config.tasks) && state.config.tasks.length){
+    return state.config.tasks;
+  }
+  const local = readJson(LS_DATA);
+  if(local && local.config && Array.isArray(local.config.tasks) && local.config.tasks.length){
+    return local.config.tasks;
+  }
+  const cache = readJson(LS_CACHE);
+  if(cache && cache.config && Array.isArray(cache.config.tasks) && cache.config.tasks.length){
+    return cache.config.tasks;
+  }
+  return DEFAULT_TASKS;
+}
 let state = collectState();
 function collectState(){
   const local = readJson(LS_DATA), cache = readJson(LS_CACHE);

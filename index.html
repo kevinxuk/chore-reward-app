@@ -154,6 +154,56 @@ table.grid{border-collapse:collapse;width:max-content;min-width:100%;font-size:.
 .cloud-btn.st-error,.cloud-btn.st-auth{border-color:#e08585;background:#fdf0f0}
 @keyframes cpulse{50%{opacity:.45}}
 
+/* ===== 任务与金额管理抽屉 ===== */
+.td-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:120;display:flex;justify-content:flex-end;opacity:0;pointer-events:none;transition:opacity .25s ease}
+.td-mask.show{opacity:1;pointer-events:auto}
+.td-drawer{width:100%;max-width:540px;background:#fff;height:100%;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.15);transform:translateX(100%);transition:transform .25s cubic-bezier(.16,1,.3,1)}
+.td-mask.show .td-drawer{transform:translateX(0)}
+.td-header{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;background:#fcfcfc}
+.td-header h2{font-size:1.05rem;font-weight:800;color:var(--ink);flex:1;display:flex;align-items:center;gap:6px}
+.td-btn-add{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:6px 12px;font-size:.82rem;font-weight:600;display:flex;align-items:center;gap:4px}
+.td-btn-reset{background:#fff;color:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.78rem}
+.td-btn-reset:hover{color:var(--red);border-color:var(--red)}
+.td-btn-close{border:0;background:transparent;font-size:1.3rem;color:var(--ink2);padding:0 6px;line-height:1}
+.td-body{flex:1;overflow-y:auto;padding:12px 16px;background:var(--bg)}
+.td-grp-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden;border:1px solid #eee}
+.td-grp-hd{padding:9px 12px;font-size:.85rem;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+.td-grp-card.grp-morning .td-grp-hd{background:var(--c-morning)}
+.td-grp-card.grp-chore .td-grp-hd{background:var(--c-chore)}
+.td-grp-card.grp-study .td-grp-hd{background:var(--c-study)}
+.td-grp-card.grp-sport .td-grp-hd{background:var(--c-sport)}
+.td-task-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-top:1px solid #f2f2f2;background:#fff;transition:background .1s}
+.td-task-row:hover{background:#fafafa}
+.td-task-main{flex:1;min-width:0}
+.td-task-title{font-size:.9rem;font-weight:600;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.td-we-badge{font-size:.65rem;color:var(--red);background:#ffebee;padding:1px 6px;border-radius:4px;font-weight:normal}
+.td-task-sub{font-size:.75rem;color:var(--ink2);margin-top:2px;display:flex;align-items:center;gap:8px}
+.td-amt-tag{color:var(--green);font-weight:700;font-size:.82rem}
+.td-amt-text{color:#999;font-size:.72rem}
+.td-task-ops{display:flex;gap:4px;flex-shrink:0}
+.td-task-ops button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:4px 8px;font-size:.75rem;color:var(--ink2)}
+.td-task-ops button:hover{background:#f5f5f5}
+.td-task-ops .btn-edit:hover{border-color:var(--blue);color:var(--blue)}
+.td-task-ops .btn-del:hover{border-color:var(--red);color:var(--red)}
+
+/* 抽屉内编辑子模态/表单 */
+.td-form-modal{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:130;display:flex;align-items:center;justify-content:center;padding:16px}
+.td-form-card{background:#fff;border-radius:14px;padding:20px;width:100%;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.22);max-height:92vh;overflow-y:auto}
+.td-form-card h3{font-size:1.05rem;margin-bottom:14px;display:flex;align-items:center;gap:6px}
+.td-form-field{margin-bottom:12px}
+.td-form-field label{display:block;font-size:.8rem;font-weight:600;color:var(--ink2);margin-bottom:5px}
+.td-form-field input[type="text"],.td-form-field input[type="number"],.td-form-field select{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.92rem;outline:none}
+.td-form-field input:focus,.td-form-field select:focus{border-color:var(--blue)}
+.td-chips{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.td-chip{border:1px solid #dcdcdc;background:#f9f9f9;border-radius:6px;padding:4px 10px;font-size:.78rem;font-weight:600;color:#555}
+.td-chip:hover{border-color:var(--blue);color:var(--blue)}
+.td-chip.on{background:#e8f4fd;border-color:var(--blue);color:var(--blue)}
+.td-checkbox-row{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.85rem;color:var(--ink)}
+.td-checkbox-row input{width:16px;height:16px;cursor:pointer}
+.td-form-err{color:var(--red);font-size:.75rem;min-height:1.2em;margin-top:6px}
+.td-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+.td-form-actions button{border:0;border-radius:8px;padding:9px 18px;font-size:.88rem;font-weight:600}
+
 footer{max-width:1200px;margin:0 auto;padding:6px 16px 20px;font-size:.7rem;color:#aaa;text-align:center}
 
 /* ===== 响应式 ===== */
@@ -198,6 +248,7 @@ footer{max-width:1200px;margin:0 auto;padding:6px 16px 20px;font-size:.7rem;colo
     </div>
   </div>
   <div class="hd-tools">
+    <button id="btnTaskManage" title="配置任务列表与奖励金额" style="border-color:#2478b8;color:#2478b8;font-weight:600">⚙️ 任务与金额管理</button>
     <button id="btnChild" title="打开孩子的只读观看页">🧒 儿童端</button>
     <button id="btnExport">📤 导出 JSON</button>
     <button id="btnImport">📥 导入 JSON</button>
@@ -345,10 +396,15 @@ function markSynced(ts){
   saveSyncCfg({lastSyncAt: ts});
 }
 function applyCloud(remote){
-  // 任务目录以本文件内置为准（云端只存用户数据与昵称/费率）
+  // 任务目录优先保留自定义配置
   const base = defaultState();
   base.childName = remote.childName || base.childName;
   if(remote.config && remote.config.gameRate>0) base.config.gameRate = remote.config.gameRate;
+  if(remote.config && Array.isArray(remote.config.tasks) && remote.config.tasks.length){
+    base.config.tasks = remote.config.tasks;
+  } else if(state && state.config && Array.isArray(state.config.tasks)){
+    base.config.tasks = state.config.tasks;
+  }
   base.records = remote.records||{}; base.expenses = remote.expenses||{};
   base.updatedAt = remote.updatedAt||null;
   base.lastSyncAt = state.lastSyncAt||null;
@@ -458,8 +514,10 @@ function fmtT(iso){ if(!iso)return"—"; const d=new Date(iso); return `${d.getM
 function applyState(s){
   const prev = state;
   state = Object.assign(defaultState(), s);
-  // 任务目录始终跟随本地内置（云端 config.tasks 仅作备份展示）
-  const localTasks = prev && prev.config && prev.config.tasks && prev.config.tasks.length ? prev.config.tasks : defaultState().config.tasks;
+  // 任务目录跟随当前本地配置或从传入数据中继承
+  const localTasks = (s && s.config && Array.isArray(s.config.tasks) && s.config.tasks.length)
+    ? s.config.tasks
+    : (prev && prev.config && prev.config.tasks && prev.config.tasks.length ? prev.config.tasks : defaultState().config.tasks);
   state.config.tasks = localTasks;
 }
 function saveStateOnly(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
@@ -979,6 +1037,250 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":
     setTimeout(()=>toast("☁️ 云同步配置成功，本机已自动开启"), 300);
   }
 })();
+/* ================= 任务与金额管理抽屉 ================= */
+(function initTaskManagerDrawer(){
+  const drawerHtml = `
+  <div class="td-mask" id="tdMask">
+    <div class="td-drawer">
+      <div class="td-header">
+        <h2>⚙️ 任务与金额管理</h2>
+        <button class="td-btn-add" id="tdBtnAdd">➕ 新增任务</button>
+        <button class="td-btn-reset" id="tdBtnReset" title="恢复预设默认任务与金额">🔄 恢复默认</button>
+        <button class="td-btn-close" id="tdBtnClose" title="关闭">✕</button>
+      </div>
+      <div class="td-body" id="tdBody"></div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML("beforeend", drawerHtml);
+
+  const tdMask = document.getElementById("tdMask");
+  const tdBody = document.getElementById("tdBody");
+  const btnManage = document.getElementById("btnTaskManage");
+
+  if(btnManage){
+    btnManage.addEventListener("click", openTaskManager);
+  }
+  document.getElementById("tdBtnClose").addEventListener("click", closeTaskManager);
+  tdMask.addEventListener("click", e=>{ if(e.target===tdMask) closeTaskManager(); });
+  document.getElementById("tdBtnAdd").addEventListener("click", ()=>openTaskEditModal(null));
+  document.getElementById("tdBtnReset").addEventListener("click", resetTasksToDefault);
+
+  function openTaskManager(){
+    renderTaskManager();
+    tdMask.classList.add("show");
+  }
+  function closeTaskManager(){
+    tdMask.classList.remove("show");
+  }
+
+  function renderTaskManager(){
+    const list = tasks();
+    const groups = {};
+    for(const t of list){
+      (groups[t.group] = groups[t.group] || []).push(t);
+    }
+    let html = "";
+    for(const g in groups){
+      const grpClass = GROUP_CLASS[g] || "";
+      html += `<div class="td-grp-card ${grpClass}">
+        <div class="td-grp-hd"><span>${g}</span><span style="font-size:.75rem;color:var(--ink2)">共 ${groups[g].length} 项</span></div>`;
+      for(const t of groups[g]){
+        html += `<div class="td-task-row">
+          <div class="td-task-main">
+            <div class="td-task-title">
+              <span>${escapeHtml(t.name)}</span>
+              ${t.weekendOnly ? `<span class="td-we-badge">仅周末</span>` : ""}
+            </div>
+            <div class="td-task-sub">
+              <span class="td-amt-tag">¥${t.amount}</span>
+              <span class="td-amt-text">显示文案: ${escapeHtml(t.amountText||"")}</span>
+            </div>
+          </div>
+          <div class="td-task-ops">
+            <button class="btn-edit" data-edit-id="${t.id}" title="编辑名称与金额">✏️ 编辑</button>
+            <button class="btn-del" data-del-id="${t.id}" title="删除任务">🗑️ 删除</button>
+          </div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+    if(!list.length){
+      html = `<div style="text-align:center;padding:40px 10px;color:#999;font-size:.85rem">暂无任务，请点击上方「➕ 新增任务」或「🔄 恢复默认」</div>`;
+    }
+    tdBody.innerHTML = html;
+
+    tdBody.querySelectorAll("button[data-edit-id]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const tid = btn.getAttribute("data-edit-id");
+        const t = tasks().find(x=>x.id===tid);
+        if(t) openTaskEditModal(t);
+      });
+    });
+    tdBody.querySelectorAll("button[data-del-id]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const tid = btn.getAttribute("data-del-id");
+        deleteTask(tid);
+      });
+    });
+  }
+
+  function openTaskEditModal(t){
+    const isNew = !t;
+    const defGroup = t ? t.group : "🏠 家务";
+    const curName = t ? t.name : "";
+    const curAmount = t ? t.amount : 1;
+    const curText = t ? t.amountText : "+1元";
+    const curWe = t ? !!t.weekendOnly : false;
+
+    const modal = document.createElement("div");
+    modal.className = "td-form-modal";
+    modal.innerHTML = `
+      <div class="td-form-card">
+        <h3>${isNew ? "➕ 新增任务" : "✏️ 编辑任务与金额"}</h3>
+        <div class="td-form-field">
+          <label>所属分组</label>
+          <div class="td-chips" id="fmGrpChips">
+            ${["🌅 晨间","🏠 家务","📚 学习","🏃 运动"].map(g=>`<button type="button" class="td-chip ${g===defGroup?'on':''}" data-val="${g}">${g}</button>`).join("")}
+          </div>
+          <input type="text" id="fmGroup" value="${escapeHtml(defGroup)}" placeholder="自定义或点击上方预设分组" style="margin-top:6px">
+        </div>
+        <div class="td-form-field">
+          <label>任务名称</label>
+          <input type="text" id="fmName" value="${escapeHtml(curName)}" placeholder="例如：整理书架 / 跳绳100下">
+        </div>
+        <div class="td-form-field">
+          <label>奖励金额（元）</label>
+          <input type="number" id="fmAmount" step="0.5" min="0.1" value="${curAmount}" placeholder="例如：1.5">
+          <div class="td-chips" id="fmAmtChips">
+            ${[0.5, 1, 1.5, 2, 3, 5].map(v=>`<button type="button" class="td-chip ${Number(v)===Number(curAmount)?'on':''}" data-val="${v}">¥${v}</button>`).join("")}
+          </div>
+        </div>
+        <div class="td-form-field">
+          <label>显示文案（卡片及表格展示）</label>
+          <input type="text" id="fmAmountText" value="${escapeHtml(curText)}" placeholder="例如：+1.5元 或 +1~3元">
+        </div>
+        <div class="td-checkbox-row">
+          <input type="checkbox" id="fmWeekend" ${curWe ? "checked" : ""}>
+          <label for="fmWeekend" style="cursor:pointer">仅限周六、周日显示与打卡</label>
+        </div>
+        <div class="td-form-err" id="fmErr"></div>
+        <div class="td-form-actions">
+          <button class="m-cancel" id="fmCancel">取消</button>
+          <button class="m-ok" id="fmSave">保存</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    const grpInput = modal.querySelector("#fmGroup");
+    modal.querySelectorAll("#fmGrpChips .td-chip").forEach(ch=>{
+      ch.addEventListener("click", ()=>{
+        grpInput.value = ch.getAttribute("data-val");
+        modal.querySelectorAll("#fmGrpChips .td-chip").forEach(c=>c.classList.toggle("on", c===ch));
+      });
+    });
+
+    const amtInput = modal.querySelector("#fmAmount");
+    const textInput = modal.querySelector("#fmAmountText");
+    let textModifiedManually = !isNew && curText !== `+${curAmount}元`;
+
+    textInput.addEventListener("input", ()=>{
+      textModifiedManually = true;
+    });
+
+    amtInput.addEventListener("input", ()=>{
+      const val = parseFloat(amtInput.value);
+      if(!textModifiedManually && !isNaN(val) && val > 0){
+        textInput.value = `+${val}元`;
+      }
+      modal.querySelectorAll("#fmAmtChips .td-chip").forEach(c=>{
+        c.classList.toggle("on", parseFloat(c.getAttribute("data-val")) === val);
+      });
+    });
+
+    modal.querySelectorAll("#fmAmtChips .td-chip").forEach(ch=>{
+      ch.addEventListener("click", ()=>{
+        const v = ch.getAttribute("data-val");
+        amtInput.value = v;
+        if(!textModifiedManually){
+          textInput.value = `+${v}元`;
+        }
+        modal.querySelectorAll("#fmAmtChips .td-chip").forEach(c=>c.classList.toggle("on", c===ch));
+      });
+    });
+
+    const closeModal = ()=>modal.remove();
+    modal.addEventListener("click", e=>{ if(e.target===modal) closeModal(); });
+    modal.querySelector("#fmCancel").onclick = closeModal;
+
+    modal.querySelector("#fmSave").onclick = ()=>{
+      const groupVal = (grpInput.value || "").trim() || "🏠 家务";
+      const nameVal = (modal.querySelector("#fmName").value || "").trim();
+      const amtVal = parseFloat(amtInput.value);
+      const textVal = (textInput.value || "").trim() || (amtVal>0 ? `+${amtVal}元` : "");
+      const weVal = modal.querySelector("#fmWeekend").checked;
+      const errEl = modal.querySelector("#fmErr");
+
+      if(!nameVal){
+        errEl.textContent = "请填写任务名称";
+        return;
+      }
+      if(isNaN(amtVal) || amtVal <= 0){
+        errEl.textContent = "请输入大于 0 的奖励金额";
+        return;
+      }
+
+      if(isNew){
+        const newId = "t_" + Date.now();
+        state.config.tasks.push({
+          id: newId,
+          group: groupVal,
+          name: nameVal,
+          amount: Math.round(amtVal * 100) / 100,
+          amountText: textVal,
+          weekendOnly: weVal
+        });
+        toast(`已新增任务「${nameVal}」`);
+      } else {
+        t.group = groupVal;
+        t.name = nameVal;
+        t.amount = Math.round(amtVal * 100) / 100;
+        t.amountText = textVal;
+        t.weekendOnly = weVal;
+        toast(`已更新任务「${nameVal}」`);
+      }
+
+      saveState();
+      renderTaskManager();
+      render();
+      closeModal();
+    };
+  }
+
+  function deleteTask(tid){
+    const t = tasks().find(x=>x.id===tid);
+    if(!t) return;
+    if(!confirm(`确定要删除任务「${t.name}」吗？\n（历史已完成的打卡记录和累计金额将完整保留）`)){
+      return;
+    }
+    state.config.tasks = state.config.tasks.filter(x=>x.id!==tid);
+    saveState();
+    renderTaskManager();
+    render();
+    toast(`已删除「${t.name}」`);
+  }
+
+  function resetTasksToDefault(){
+    if(!confirm("确定要将任务列表恢复为系统预设的 24 项任务与金额吗？\n当前的自定义任务修改将被重置。")){
+      return;
+    }
+    state.config.tasks = DEFAULT_TASKS.map(t=>({...t}));
+    saveState();
+    renderTaskManager();
+    render();
+    toast("已恢复预设任务与金额");
+  }
+})();
+
 $("#cloudBtn").addEventListener("click", cloudBtnClick);
 $("#btnChild").addEventListener("click", ()=>{ location.href = location.protocol==="file:" ? "儿童端打卡一览.html" : "child.html"; });
 render();
