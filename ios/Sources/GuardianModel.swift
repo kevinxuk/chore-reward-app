@@ -31,7 +31,7 @@ final class GuardianModel: ObservableObject {
     @Published var everSynced = false
     @Published var lastSync: Date?
     @Published var remaining: TimeInterval = 0
-    @Published var clockText = ""
+    @Published var nowTick = Date()   // 每次心跳刷新，驱动时钟文本重绘
 
     var endTime: Date?
     private var unlockStart: Date?
@@ -50,7 +50,7 @@ final class GuardianModel: ObservableObject {
     var clockText: String {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return f.string(from: Date())
+        return f.string(from: nowTick)
     }
 
     init() {
@@ -204,6 +204,7 @@ final class GuardianModel: ObservableObject {
     }
 
     private func tick() {
+        nowTick = Date()
         switch mode {
         case .congrats:
             if let until = congratsUntil, Date() >= until {
