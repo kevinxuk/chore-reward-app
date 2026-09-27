@@ -249,6 +249,7 @@ footer{max-width:1200px;margin:0 auto;padding:6px 16px 20px;font-size:.7rem;colo
   </div>
   <div class="hd-tools">
     <button id="btnTaskManage" title="配置任务列表与奖励金额" style="border-color:#2478b8;color:#2478b8;font-weight:600">⚙️ 任务与金额管理</button>
+    <button id="btnPCGuard" title="控制孩子电脑本次可用时长（打卡联动）" style="border-color:#b8860b;color:#b8860b;font-weight:600">🖥️ 电脑时长</button>
     <button id="btnChild" title="打开孩子的只读观看页">🧒 儿童端</button>
     <button id="btnExport">📤 导出 JSON</button>
     <button id="btnImport">📥 导入 JSON</button>
@@ -302,7 +303,7 @@ let gamePick = 1;                // 游戏兑换临时选择（小时）
 let fileHandle = null;
 
 function defaultState(){
-  return {version:1, childName:"孩子", config:{gameRate:5, tasks:DEFAULT_TASKS.map(t=>({...t}))}, records:{}, expenses:{}, updatedAt:null, lastSyncAt:null};
+  return {version:1, childName:"孩子", config:{gameRate:5, computer:{minutes:30, unlock:false}, tasks:DEFAULT_TASKS.map(t=>({...t}))}, records:{}, expenses:{}, updatedAt:null, lastSyncAt:null};
 }
 function loadState(){
   try{
@@ -311,6 +312,9 @@ function loadState(){
     const s = JSON.parse(raw);
     if(s && s.version===1 && Array.isArray(s.config?.tasks)){
       s.config.gameRate = s.config.gameRate>0 ? s.config.gameRate : 5;
+      s.config.computer = (s.config.computer && typeof s.config.computer==="object") ? s.config.computer : {};
+      s.config.computer.minutes = Math.max(1, Math.round(+s.config.computer.minutes || 30));
+      s.config.computer.unlock = !!s.config.computer.unlock;
       s.records = s.records||{}; s.expenses = s.expenses||{};
       s.updatedAt = s.updatedAt||null; s.lastSyncAt = s.lastSyncAt||null;
       return s;
@@ -933,6 +937,58 @@ function exportData(){
   a.click(); URL.revokeObjectURL(a.href);
 }
 $("#btnExport").addEventListener("click",()=>{exportData();toast("已导出 JSON 备份文件")});
+
+/* ================= 孩子电脑时长控制（PCGuardian 联动） =================
+   数据存在 state.config.computer = {minutes, unlock}，随打卡数据一起
+   通过云同步推到 Gist；孩子电脑上的 guardian 程序每 1 分钟只读拉取生效。 */
+function openPCGuard(){
+  const mask=document.createElement("div"); mask.className="modal-mask";
+  const cur=state.config.computer, curM=cur.minutes;
+  const quick=[15,20,30,45,60,90,120];
+  mask.innerHTML=`<div class="modal" style="max-width:420px">
+    <h3>🖥️ 孩子电脑使用控制</h3>
+    <p style="font-size:.78rem;color:#666;margin:4px 0 10px">
+      孩子开机后电脑自动锁定，<b>「语文/英语阅读」</b>和<b>「背单词/古诗词」</b>两项都打卡完成后才自动解锁；
+      改动约 1 分钟内同步到孩子电脑（需 ☁️ 云同步正常）。</p>
+    <div style="font-size:.8rem;color:#888;margin-bottom:6px">本次可使用时长（分钟）</div>
+    <div class="chip-row" style="flex-wrap:wrap">
+      ${quick.map(m=>`<button type="button" class="chip pc-min ${m===curM?'on':''}" data-m="${m}">${m} 分钟</button>`).join("")}
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
+      <input id="pcMin" type="number" min="1" max="600" step="5" value="${curM}" style="width:90px">
+      <span style="font-size:.8rem;color:#888">自定义分钟（保存后生效）</span>
+    </div>
+    <div style="margin-top:14px;padding:10px;background:#fff8e6;border-radius:10px;display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:.8rem">🛠️ <b>家长临时解锁</b><br><span style="color:#999;font-size:.7rem">不倒计时直接解锁；关闭后恢复管控</span></span>
+      <button type="button" id="pcUnlock" class="chip ${cur.unlock?'on':''}" style="border-color:#e5484d;color:#e5484d">${cur.unlock?'已开启 ✔':'已关闭'}</button>
+    </div>
+    <p style="font-size:.7rem;color:#999;margin-top:8px">当前设置：${curM} 分钟${cur.unlock?' · 临时解锁中':''}。倒计时结束电脑自动锁定并关机。</p>
+    <div class="m-actions"><button class="m-cancel">取消</button><button class="m-ok" id="pcSave">保存</button></div>
+  </div>`;
+  document.body.appendChild(mask);
+  const close=()=>mask.remove();
+  mask.addEventListener("click",e=>{ if(e.target===mask) close(); });
+  mask.querySelector(".m-cancel").onclick=close;
+  mask.querySelectorAll(".pc-min").forEach(ch=>ch.addEventListener("click",()=>{
+    mask.querySelectorAll(".pc-min").forEach(c=>c.classList.toggle("on", c===ch));
+    mask.querySelector("#pcMin").value=ch.dataset.m;
+  }));
+  mask.querySelector("#pcUnlock").addEventListener("click",e=>{
+    const on=!e.currentTarget.classList.contains("on");
+    e.currentTarget.classList.toggle("on", on);
+    e.currentTarget.textContent=on?"已开启 ✔":"已关闭";
+  });
+  mask.querySelector("#pcSave").onclick=()=>{
+    const m=Math.max(1, Math.round(+mask.querySelector("#pcMin").value || 0));
+    if(!(m>0)){ toast("时长需大于 0 分钟"); return; }
+    const unlock=mask.querySelector("#pcUnlock").classList.contains("on");
+    state.config.computer={minutes:m, unlock};
+    saveState(); render();
+    toast(unlock?"🛠️ 已开启家长临时解锁（约1分钟内生效）":"🖥️ 已保存：每次可用 "+m+" 分钟（约1分钟内生效）");
+    close();
+  };
+}
+$("#btnPCGuard").addEventListener("click",openPCGuard);
 $("#btnImport").addEventListener("click",()=>$("#importFile").click());
 $("#importFile").addEventListener("change",e=>{
   const f=e.target.files[0]; if(!f) return;
