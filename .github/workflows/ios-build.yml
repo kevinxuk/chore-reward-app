@@ -16,6 +16,12 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Select newest Xcode (xcodegen emits objectVersion 77)
+        run: |
+          ls -d /Applications/Xcode*.app
+          sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)"
+          xcodebuild -version
+
       - name: Generate Xcode project
         working-directory: ios
         run: xcodegen generate
