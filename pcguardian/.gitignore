@@ -1,0 +1,15 @@
+ai-config.json
+guardian.local.json
+guardian.*.json
+chore-*.json
+receipt.json
+*.log
+*.wav
+__pycache__/
+models/
+*.exe
+*.ipa
+screenshots/
+parent-output.json
+*e2e*.json
+seed-default.json

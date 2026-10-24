@@ -16,7 +16,7 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{font-size:15px}
 body{font-family:"PingFang SC","Microsoft YaHei","Segoe UI",sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;padding-bottom:70px}
-button{font-family:inherit;cursor:pointer}
+button{font-family:inherit;cursor:pointer;touch-action:manipulation}
 
 /* ===== 顶栏 ===== */
 header{position:sticky;top:0;z-index:50;background:#fff;border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
@@ -82,10 +82,6 @@ main{max-width:1200px;margin:0 auto;padding:12px}
 .spend-card h3{font-size:.95rem;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .spend-card h3 .bal-hint{margin-left:auto;font-weight:400;font-size:.72rem;color:var(--ink2)}
 .game-hours{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.gh-btn{border:1.5px solid #e0b97c;background:#fff;border-radius:10px;padding:7px 0;flex:1;min-width:56px;text-align:center;font-size:.85rem;font-weight:600}
-.gh-btn small{display:block;font-weight:400;font-size:.68rem;color:var(--ink2)}
-.gh-btn.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.gh-btn.on small{color:#fff8ea}
 .custom-game{display:flex;gap:8px;align-items:center;margin-bottom:8px;font-size:.8rem}
 .custom-game input{width:70px;border:1px solid #e0b97c;border-radius:8px;padding:6px;font-size:.85rem;text-align:center}
 .spend-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -154,7 +150,7 @@ table.grid{border-collapse:collapse;width:max-content;min-width:100%;font-size:.
 .cloud-btn.st-error,.cloud-btn.st-auth{border-color:#e08585;background:#fdf0f0}
 @keyframes cpulse{50%{opacity:.45}}
 
-/* ===== 任务与金额管理抽屉 ===== */
+/* ===== 任务管理抽屉 ===== */
 .td-mask{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:120;display:flex;justify-content:flex-end;opacity:0;pointer-events:none;transition:opacity .25s ease}
 .td-mask.show{opacity:1;pointer-events:auto}
 .td-drawer{width:100%;max-width:540px;background:#fff;height:100%;display:flex;flex-direction:column;box-shadow:-4px 0 24px rgba(0,0,0,.15);transform:translateX(100%);transition:transform .25s cubic-bezier(.16,1,.3,1)}
@@ -224,7 +220,8 @@ footer{max-width:1200px;margin:0 auto;padding:6px 16px 20px;font-size:.7rem;colo
 <body>
 <header>
   <div class="hd-top">
-    <span class="hd-title">🌟 家务零花钱 · <span class="child" id="childName" title="点击修改昵称">孩子</span></span>
+    <span class="hd-title">🌟 家务零花钱 · <span class="child" id="childName" title="点击修改昵称">孩子</span>
+      <button id="btnChild" title="打开孩子的只读观看页" style="border:1px solid var(--line);background:#fff;border-radius:8px;width:30px;height:30px;font-size:.95rem;padding:0;vertical-align:middle;margin-left:6px;cursor:pointer">🧒</button></span>
     <span class="hd-bal">
       <span id="fileBadge" style="display:none" class="file-badge">📁 <span id="fileName"></span> <button id="unbindFile" style="border:0;background:transparent;color:inherit;cursor:pointer;text-decoration:underline;padding:0">解除</button></span>
       <span class="game-sum" id="hdGame"></span>
@@ -248,11 +245,11 @@ footer{max-width:1200px;margin:0 auto;padding:6px 16px 20px;font-size:.7rem;colo
     </div>
   </div>
   <div class="hd-tools">
-    <button id="btnTaskManage" title="配置任务列表与奖励金额" style="border-color:#2478b8;color:#2478b8;font-weight:600">⚙️ 任务与金额管理</button>
-    <button id="btnPCGuard" title="控制孩子电脑本次可用时长（打卡联动）" style="border-color:#b8860b;color:#b8860b;font-weight:600">🖥️ 电脑时长</button>
-    <button id="btnChild" title="打开孩子的只读观看页">🧒 儿童端</button>
-    <button id="btnExport">📤 导出 JSON</button>
-    <button id="btnImport">📥 导入 JSON</button>
+    <button id="btnTaskManage" title="配置任务列表与奖励金额" style="border-color:#2478b8;color:#2478b8;font-weight:600">⚙️ 任务管理</button>
+    <button id="btnDispatch" title="分派电脑任务与奖励时长（含 AI 评分、零花钱兑换、临时解锁）" style="border-color:#6a4fb0;color:#6a4fb0;font-weight:600">🖥️ 电脑任务</button>
+    <button id="btnAI" title="配置 AI 评分接口（OpenAI 兼容，密钥存独立 Gist）" style="border-color:#0d9488;color:#0d9488;font-weight:600">🤖 AI设置</button>
+    <button id="btnExport" title="导出 JSON 备份">📤</button>
+    <button id="btnImport" title="导入 JSON 备份">📥</button>
     <button id="btnBind" style="display:none">🔗 绑定数据文件</button>
     <input type="file" id="importFile" accept=".json,application/json" style="display:none">
   </div>
@@ -260,7 +257,7 @@ footer{max-width:1200px;margin:0 auto;padding:6px 16px 20px;font-size:.7rem;colo
 
 <main id="main"></main>
 
-<footer>数据保存在本机浏览器 · 可导出 JSON 备份/换机迁移 · 周末可用零花钱兑换游戏时间（¥<span id="ftRate">5</span>/小时）及自定义消费</footer>
+<footer>数据保存在本机浏览器 · 可导出 JSON 备份/换机迁移 · 周末可添加自定义消费记录；游戏时长兑换已整合进「🖥️ 电脑任务」（¥<span id="ftRate">5</span>/小时）</footer>
 
 <script>
 "use strict";
@@ -299,11 +296,26 @@ const IDB = {db:null};
 let state = loadState();
 let view = null;                 // 'day'|'week'|'month'|'year'
 let cursor = new Date(); cursor.setHours(0,0,0,0);
-let gamePick = 1;                // 游戏兑换临时选择（小时）
 let fileHandle = null;
 
 function defaultState(){
-  return {version:1, childName:"孩子", config:{gameRate:5, computer:{minutes:30, unlock:false}, tasks:DEFAULT_TASKS.map(t=>({...t}))}, records:{}, expenses:{}, updatedAt:null, lastSyncAt:null};
+  return {version:1, childName:"孩子", config:{gameRate:5, computer:{minutes:30, unlock:false}, dispatch:{tasks:[]}, ai:{}, tasks:DEFAULT_TASKS.map(t=>({...t}))}, records:{}, expenses:{}, updatedAt:null, lastSyncAt:null};
+}
+function normalizeConfig(s){
+  // 补齐/校验 config 里的可选段（旧数据、云端数据可能缺）
+  s.config.computer = (s.config.computer && typeof s.config.computer==="object") ? s.config.computer : {};
+  s.config.computer.minutes = Math.max(1, Math.round(+s.config.computer.minutes || 30));
+  s.config.computer.unlock = !!s.config.computer.unlock;
+  const rd = s.config.computer.redeem;
+  s.config.computer.redeem = (rd && typeof rd==="object")
+    ? {enabled: !!rd.enabled, dailyCap: Math.min(500, Math.max(0.5, Math.round((+rd.dailyCap||10)*100)/100))}
+    : {enabled: true, dailyCap: 10};      // 零花钱自助兑换：默认开启、每日上限 10 元
+  const rq = s.config.computer.required;
+  s.config.computer.required = Array.isArray(rq) ? rq.map(String) : [];   // 默认无必做任务
+  s.config.dispatch = (s.config.dispatch && typeof s.config.dispatch==="object" && Array.isArray(s.config.dispatch.tasks))
+    ? s.config.dispatch : {tasks:[]};
+  s.config.ai = (s.config.ai && typeof s.config.ai==="object") ? s.config.ai : {};
+  return s;
 }
 function loadState(){
   try{
@@ -312,9 +324,7 @@ function loadState(){
     const s = JSON.parse(raw);
     if(s && s.version===1 && Array.isArray(s.config?.tasks)){
       s.config.gameRate = s.config.gameRate>0 ? s.config.gameRate : 5;
-      s.config.computer = (s.config.computer && typeof s.config.computer==="object") ? s.config.computer : {};
-      s.config.computer.minutes = Math.max(1, Math.round(+s.config.computer.minutes || 30));
-      s.config.computer.unlock = !!s.config.computer.unlock;
+      normalizeConfig(s);
       s.records = s.records||{}; s.expenses = s.expenses||{};
       s.updatedAt = s.updatedAt||null; s.lastSyncAt = s.lastSyncAt||null;
       return s;
@@ -409,6 +419,15 @@ function applyCloud(remote){
   } else if(state && state.config && Array.isArray(state.config.tasks)){
     base.config.tasks = state.config.tasks;
   }
+  // 电脑时长 / 任务分派 / AI 配置：云端有则用云端，云端缺段则保留本机（老数据兼容）
+  if(remote.config && remote.config.computer) base.config.computer = remote.config.computer;
+  if(remote.config && remote.config.dispatch && Array.isArray(remote.config.dispatch.tasks)){
+    base.config.dispatch = remote.config.dispatch;
+  } else if(state && state.config && state.config.dispatch){
+    base.config.dispatch = state.config.dispatch;
+  }
+  if(remote.config && remote.config.ai) base.config.ai = remote.config.ai;
+  normalizeConfig(base);
   base.records = remote.records||{}; base.expenses = remote.expenses||{};
   base.updatedAt = remote.updatedAt||null;
   base.lastSyncAt = state.lastSyncAt||null;
@@ -523,6 +542,7 @@ function applyState(s){
     ? s.config.tasks
     : (prev && prev.config && prev.config.tasks && prev.config.tasks.length ? prev.config.tasks : defaultState().config.tasks);
   state.config.tasks = localTasks;
+  normalizeConfig(state);
 }
 function saveStateOnly(){ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
 /* 云同步设置弹层 */
@@ -681,20 +701,14 @@ function renderDay(){
   if(we){
     const avail = totalBalance();
     html += `<div class="spend-card">
-      <h3>🎁 周末兑换 <span class="bal-hint">可用结余 ${money(avail)}</span></h3>
-      <div class="game-hours">
-        ${[1,2,3,4,5].map(h=>`<button class="gh-btn ${gamePick===h?'on':''}" data-h="${h}">${h}小时<small>${money(h*state.config.gameRate)}</small></button>`).join("")}
-      </div>
-      <div class="custom-game">自定义时长 <input type="number" id="ghCustom" min="0.5" step="0.5" value="${gamePick}"> 小时 ·
-        <b style="color:var(--accent)" id="ghCost">${money(gamePick*state.config.gameRate)}</b></div>
+      <h3>🎁 周末消费 <span class="bal-hint">可用结余 ${money(avail)}</span></h3>
       <div class="spend-actions">
-        <button class="btn-redeem" id="btnRedeem">🎮 兑换游戏时间</button>
-        <button class="btn-add-exp" id="btnAddExp">➕ 添加消费项</button>
+        <button class="btn-add-exp" id="btnAddExp">➕ 添加消费项（如：零花钱转到支付宝）</button>
       </div>
       ${renderDayExpenses(dk)}
     </div>`;
   }else{
-    html += `<div class="midweek-note">📅 兑换游戏时间和自定义消费仅限<strong>周六、周日</strong>进行，平时坚持打卡攒零花钱吧！</div>`;
+    html += `<div class="midweek-note">📅 自定义消费记录仅限<strong>周六、周日</strong>添加；用零花钱兑换电脑时长请到「🖥️ 电脑任务」。</div>`;
   }
 
   const groups = {};
@@ -727,11 +741,6 @@ function bindDay(){
   main.querySelectorAll(".task:not(.off)").forEach(el=>{
     el.addEventListener("click", ()=>{ toggleTask(el.dataset.task, dkey(cursor)); });
   });
-  main.querySelectorAll(".gh-btn").forEach(b=>b.addEventListener("click",()=>{gamePick=+b.dataset.h;render();}));
-  const ci=$("#ghCustom"); if(ci) ci.addEventListener("change",()=>{
-    const v=clampHours(+ci.value||0.5); gamePick=v; render();
-  });
-  const br=$("#btnRedeem"); if(br) br.addEventListener("click",()=>redeemGame(dkey(cursor)));
   const ba=$("#btnAddExp"); if(ba) ba.addEventListener("click",()=>openCustomExpense(dkey(cursor)));
   main.querySelectorAll(".ex-del").forEach(b=>b.addEventListener("click",()=>{delExpense(dkey(cursor),+b.dataset.expidx);}));
 }
@@ -763,15 +772,7 @@ function openWeekendAmount(t, dk){
   });
 }
 
-/* ================= 周末消费 ================= */
-function redeemGame(dk){
-  const cost = Math.round(gamePick*state.config.gameRate*100)/100;
-  const avail = totalBalance();
-  if(cost>avail){ toast("结余不足：需要 "+money(cost)+"，还差 "+money(cost-avail)); return; }
-  state.expenses[dk] = state.expenses[dk]||[];
-  state.expenses[dk].push({type:"game", hours:gamePick, amount:cost});
-  saveState(); toast("🎮 已兑换 "+gamePick+" 小时游戏时间（-"+money(cost)+"）"); render();
-}
+/* ================= 周末消费（游戏时长兑换已下线：电脑时长在「电脑任务」用零花钱兑换） ================= */
 function openCustomExpense(dk){
   const avail = totalBalance();
   showModal({
@@ -938,57 +939,492 @@ function exportData(){
 }
 $("#btnExport").addEventListener("click",()=>{exportData();toast("已导出 JSON 备份文件")});
 
-/* ================= 孩子电脑时长控制（PCGuardian 联动） =================
-   数据存在 state.config.computer = {minutes, unlock}，随打卡数据一起
-   通过云同步推到 Gist；孩子电脑上的 guardian 程序每 1 分钟只读拉取生效。 */
-function openPCGuard(){
-  const mask=document.createElement("div"); mask.className="modal-mask";
-  const cur=state.config.computer, curM=cur.minutes;
-  const quick=[15,20,30,45,60,90,120];
-  mask.innerHTML=`<div class="modal" style="max-width:420px">
-    <h3>🖥️ 孩子电脑使用控制</h3>
-    <p style="font-size:.78rem;color:#666;margin:4px 0 10px">
-      孩子开机后电脑自动锁定，<b>「语文/英语阅读」</b>和<b>「背单词/古诗词」</b>两项都打卡完成后才自动解锁；
-      改动约 1 分钟内同步到孩子电脑（需 ☁️ 云同步正常）。</p>
-    <div style="font-size:.8rem;color:#888;margin-bottom:6px">本次可使用时长（分钟）</div>
-    <div class="chip-row" style="flex-wrap:wrap">
-      ${quick.map(m=>`<button type="button" class="chip pc-min ${m===curM?'on':''}" data-m="${m}">${m} 分钟</button>`).join("")}
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:10px">
-      <input id="pcMin" type="number" min="1" max="600" step="5" value="${curM}" style="width:90px">
-      <span style="font-size:.8rem;color:#888">自定义分钟（保存后生效）</span>
-    </div>
-    <div style="margin-top:14px;padding:10px;background:#fff8e6;border-radius:10px;display:flex;justify-content:space-between;align-items:center">
-      <span style="font-size:.8rem">🛠️ <b>家长临时解锁</b><br><span style="color:#999;font-size:.7rem">不倒计时直接解锁；关闭后恢复管控</span></span>
-      <button type="button" id="pcUnlock" class="chip ${cur.unlock?'on':''}" style="border-color:#e5484d;color:#e5484d">${cur.unlock?'已开启 ✔':'已关闭'}</button>
-    </div>
-    <p style="font-size:.7rem;color:#999;margin-top:8px">当前设置：${curM} 分钟${cur.unlock?' · 临时解锁中':''}。倒计时结束电脑自动锁定并关机。</p>
-    <div class="m-actions"><button class="m-cancel">取消</button><button class="m-ok" id="pcSave">保存</button></div>
-  </div>`;
+/* ==== 电脑任务（合并原「电脑时长」与「任务分派」） ====*/
+
+/* ================= 任务分派（奖励电脑时长，不产生零花钱） =================
+   数据存 state.config.dispatch = {tasks:[{id,name,minutes,createdAt}]}；
+   完成打卡复用 records（不写 amount → 收入统计不受影响，即「不计算奖金」）。
+   孩子电脑 PCGuardian 锁定页显示任务清单；已完成且未使用的奖励出现在
+   「🎁 可用的奖励时间」，孩子可多选累计使用；点击「开始使用」即从
+   孩子电脑的本地台账扣除（孩子端只读 Gist，已用状态存孩子本机，防篡改）。 */
+function dispatchTasks(){ return state.config.dispatch.tasks; }
+function dispatchEarned(tid){
+  // 与孩子端同口径：取全部记录中最新一天的 done 值（撤销打卡即收回未使用的奖励）
+  let res=false;
+  for(const dk of Object.keys(state.records||{}).sort()){
+    const e=(state.records[dk]||{})[tid];
+    if(e) res=!!e.done;
+  }
+  return res;
+}
+function dispatchSetDone(tid, done){
+  const dk=dkey(new Date());
+  if(done){
+    state.records[dk] = state.records[dk]||{};
+    state.records[dk][tid] = {done:true};          // 无 amount → 不计奖金
+  }else{
+    for(const k in state.records){
+      delete state.records[k][tid];
+      if(!Object.keys(state.records[k]).length) delete state.records[k];
+    }
+  }
+  saveState();
+}
+function openDispatch(){
+  const rd=state.config.computer.redeem||{enabled:true,dailyCap:10};
+  // 抽屉容器（与「任务管理」同款样式）
+  const mask=document.createElement("div"); mask.className="td-mask";
+  mask.innerHTML=`
+    <div class="td-drawer">
+      <div class="td-header">
+        <h2>🖥️ 电脑任务</h2>
+        <button type="button" id="dpUnlock" class="chip ${state.config.computer.unlock?"on":""}"
+          style="border-color:#e5484d;color:#e5484d">${state.config.computer.unlock?"🛠️ 临时解锁：开 ✔":"🛠️ 临时解锁：关"}</button>
+        <button type="button" class="td-btn-close" id="dpClose" title="关闭">✕</button>
+      </div>
+      <div class="td-body">
+        <div class="td-grp-card" style="border-left:4px solid #1e8449">
+          <div class="td-grp-hd" style="background:#eef7f0"><span>💰 零花钱自助兑换 <span style="font-weight:400;font-size:.72rem;color:#999">（仅周末可兑换）</span></span></div>
+          <div style="padding:10px 12px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span style="font-size:.8rem">孩子锁定页按兑换价用零花钱换电脑时长</span>
+              <button type="button" id="dpRedeem" class="chip ${rd.enabled?"on":""}" style="flex:none;border-color:#1e8449;color:#1e8449">${rd.enabled?"已开启 ✔":"已关闭"}</button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:.78rem;color:#555;flex-wrap:wrap">
+              每日上限 <input id="dpRedeemCap" type="number" min="1" max="500" step="0.5" value="${rd.dailyCap}" style="width:64px"> 元 ·
+              兑换价 <input id="dpGameRate" type="number" min="0.5" max="100" step="0.5" value="${state.config.gameRate}" style="width:60px"> 元/小时
+              <button type="button" id="dpRedeemSave" style="border:1px solid #1e8449;background:#1e8449;color:#fff;border-radius:7px;padding:4px 12px;font-size:.75rem;font-weight:600;cursor:pointer">保存兑换设置</button>
+            </div>
+            <p style="font-size:.68rem;color:#999;margin-top:6px">兑换价同时用于周末消费换算；兑换在孩子电脑本机记账（防篡改），明细见孩子电脑 guardian.log 的 [redeem] 记录。</p>
+          </div>
+        </div>
+        <div class="td-grp-card" style="border-left:4px solid #b8860b">
+          <div class="td-grp-hd" style="background:#fff8e6"><span>⭐ 必须完成任务</span><span style="font-weight:400;font-size:.72rem;color:#999">完成后才能使用电脑时长 · 点选/取消立即生效</span></div>
+          <div style="padding:10px 12px">
+            <div id="dpReqList" style="max-height:173px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;background:#fff;-webkit-overflow-scrolling:touch"></div>
+            <p style="font-size:.68rem;color:#999;margin-top:6px">打勾即选为必做（立即生效，约10秒内同步到孩子电脑）· 勾选的任务完成后才能使用电脑时长 · 全部不勾则时长不受必做限制</p>
+          </div>
+        </div>
+        <div class="td-grp-card">
+          <div class="td-grp-hd"><span>📋 已发布的任务</span><span style="display:flex;gap:8px;align-items:center">
+            <span id="dpSummary" style="font-size:.75rem;color:var(--ink2);font-weight:400"></span>
+            <button type="button" id="btnImportTasks" class="td-btn-add" title="批量导入朗读/单词任务（.md/.txt，一个文件=一个任务：首行=标题，其余=内容）" style="background:#6a4fb0;color:#fff;border:0;border-radius:7px;padding:4px 10px;font-size:.75rem;font-weight:600">📚 批量导入</button>
+          </span></div>
+          <div id="dpList" style="padding:0 10px 6px"></div>
+        </div>
+        <div class="td-grp-card" style="border-left:4px solid #6a4fb0">
+          <div class="td-grp-hd" style="background:#f4f0fb"><span>➕ 发布新任务</span></div>
+          <div style="padding:10px 12px">
+            <div class="chip-row" style="margin-top:0;margin-bottom:8px;flex-wrap:wrap">
+              <button type="button" class="chip dp-kind on" data-k="" style="flex:none;padding:5px 10px;font-size:.76rem">📋 普通打卡</button>
+              <button type="button" class="chip dp-kind" data-k="read" style="flex:none;padding:5px 10px;font-size:.76rem">📖 朗读评分</button>
+              <button type="button" class="chip dp-kind" data-k="words" style="flex:none;padding:5px 10px;font-size:.76rem">🔤 单词背诵</button>
+            </div>
+            <input id="dpName" type="text" maxlength="30" placeholder="任务名称（AI 类型可不填，自动取内容第一行，如《山行》）" style="width:100%">
+            <div id="dpExtra"></div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center">
+              ${[10,15,20,30,45,60].map(m=>`<button type="button" class="chip dp-min ${m===20?"on":""}" data-m="${m}" style="flex:none;padding:6px 10px;font-size:.78rem">${m}分钟</button>`).join("")}
+              <input id="dpMin" type="number" min="1" max="240" step="5" value="20" style="width:76px">
+              <span style="font-size:.75rem;color:#888">分钟</span>
+            </div>
+            <div class="m-err" id="dpErr"></div>
+            <button type="button" id="dpAdd" class="m-ok" style="width:100%;margin-top:8px;border:0;border-radius:8px;padding:9px 0;font-size:.85rem;font-weight:600">📤 发布任务</button>
+          </div>
+        </div>
+        <p style="font-size:.7rem;color:#999;margin:8px 4px 0">改动约 10 秒内同步到孩子电脑（需 ☁️ 云同步正常）。</p>
+      </div>
+    </div>`;
   document.body.appendChild(mask);
-  const close=()=>mask.remove();
-  mask.addEventListener("click",e=>{ if(e.target===mask) close(); });
-  mask.querySelector(".m-cancel").onclick=close;
-  mask.querySelectorAll(".pc-min").forEach(ch=>ch.addEventListener("click",()=>{
-    mask.querySelectorAll(".pc-min").forEach(c=>c.classList.toggle("on", c===ch));
-    mask.querySelector("#pcMin").value=ch.dataset.m;
-  }));
-  mask.querySelector("#pcUnlock").addEventListener("click",e=>{
-    const on=!e.currentTarget.classList.contains("on");
-    e.currentTarget.classList.toggle("on", on);
-    e.currentTarget.textContent=on?"已开启 ✔":"已关闭";
+  requestAnimationFrame(()=>mask.classList.add("show"));
+  const tdBorn=Date.now();
+  const close=()=>{ mask.classList.remove("show"); setTimeout(()=>mask.remove(),260); };
+  mask.addEventListener("click",e=>{ if(e.target===mask && Date.now()-tdBorn>500) close(); });
+  document.getElementById("dpClose").addEventListener("click",close);
+
+  // 右上角：家长临时解锁（点击即生效）
+  const unlockBtn=mask.querySelector("#dpUnlock");
+  unlockBtn.addEventListener("click",()=>{
+    const on=!state.config.computer.unlock;
+    state.config.computer.unlock=on;
+    saveState();
+    unlockBtn.classList.toggle("on", on);
+    unlockBtn.textContent=on?"🛠️ 临时解锁：开 ✔":"🛠️ 临时解锁：关";
+    toast(on?"🛠️ 已开启家长临时解锁（约10秒内生效，关闭后恢复管控）":"🛠️ 已关闭临时解锁，恢复管控（约10秒内生效）");
   });
-  mask.querySelector("#pcSave").onclick=()=>{
-    const m=Math.max(1, Math.round(+mask.querySelector("#pcMin").value || 0));
-    if(!(m>0)){ toast("时长需大于 0 分钟"); return; }
-    const unlock=mask.querySelector("#pcUnlock").classList.contains("on");
-    state.config.computer={minutes:m, unlock};
+  // 零花钱自助兑换
+  const redeemBtn=mask.querySelector("#dpRedeem");
+  redeemBtn.addEventListener("click",()=>{
+    state.config.computer.redeem.enabled=!state.config.computer.redeem.enabled;
+    saveState();
+    const on=state.config.computer.redeem.enabled;
+    redeemBtn.classList.toggle("on", on);
+    redeemBtn.textContent=on?"已开启 ✔":"已关闭";
+    toast(on?"💰 已开启零花钱自助兑换（周末可用）":"💰 已关闭零花钱自助兑换");
+  });
+  mask.querySelector("#dpRedeemSave").addEventListener("click",()=>{
+    const cap=Math.min(500, Math.max(1, Math.round((+mask.querySelector("#dpRedeemCap").value||10)*100)/100));
+    const rate=Math.min(100, Math.max(0.5, Math.round((+mask.querySelector("#dpGameRate").value||5)*100)/100));
+    state.config.computer.redeem.dailyCap=cap;
+    state.config.gameRate=rate;
     saveState(); render();
-    toast(unlock?"🛠️ 已开启家长临时解锁（约1分钟内生效）":"🖥️ 已保存：每次可用 "+m+" 分钟（约1分钟内生效）");
-    close();
+    mask.querySelector("#dpRedeemCap").value=cap; mask.querySelector("#dpGameRate").value=rate;
+    toast("💰 已保存：每日上限 "+cap+" 元 · 兑换价 "+rate+" 元/小时（约10秒内生效）");
+  });
+
+  const renderReqList=()=>{
+    const box=mask.querySelector("#dpReqList");
+    const req=state.config.computer.required||[];
+    const st=box.scrollTop;
+    box.innerHTML=(state.config.tasks||[]).map(t=>{
+      const on=req.includes(t.id);
+      return `<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid #f2f2f2;cursor:pointer">
+        <input type="checkbox" class="dp-req-ck" data-id="${t.id}" ${on?"checked":""} style="width:16px;height:16px;flex:none">
+        <span style="font-size:.82rem;flex:1;${on?"color:var(--green);font-weight:600":"color:#333"}">${escapeHtml(t.name)}</span>
+        ${on?`<span style="flex:none;font-size:.68rem;color:var(--green)">⭐ 必做</span>`:""}
+      </label>`;
+    }).join("") || `<div style="text-align:center;color:#999;font-size:.8rem;padding:12px 0">主任务列表为空</div>`;
+    box.querySelectorAll(".dp-req-ck").forEach(ck=>ck.addEventListener("change",()=>{
+      const id=ck.dataset.id;
+      const req=state.config.computer.required||[];
+      const i=req.indexOf(id);
+      if(ck.checked){ if(i<0) req.push(id); }
+      else if(i>=0) req.splice(i,1);
+      state.config.computer.required=req;
+      saveState();
+      renderReqList();
+      toast(req.length?("⭐ 已选 "+req.length+" 项必做任务（约10秒内生效）"):"⭐ 已清空必做任务（电脑时长不受必做限制）");
+    }));
+    box.scrollTop=st;
+  };
+  const renderList=()=>{
+    const list=dispatchTasks();
+    const el=mask.querySelector("#dpList");
+    const summary=mask.querySelector("#dpSummary");
+    if(!list.length){
+      el.innerHTML=`<div style="text-align:center;color:#999;font-size:.8rem;padding:12px 0">还没有发布任务，用下方表单发布第一个吧</div>`;
+      if(summary) summary.textContent="";
+      return;
+    }
+    // 孩子端回执（局域网联调同步桥注入；正式环境无此通道则无回执）
+    const aiRes={};
+    (window.__aiResults||[]).forEach(r=>{ aiRes[r.taskId]=r; });
+    const aiN=list.filter(t=>t.kind).length;
+    const doneN=list.filter(t=>!t.kind && dispatchEarned(t.id)).length;
+    const aiPassN=list.filter(t=>t.kind && aiRes[t.id] && aiRes[t.id].score>0).length;
+    const mins=list.reduce((s,t)=>s+(+t.minutes||0),0);
+    if(summary) summary.textContent="共 "+list.length+" 项 · 打卡完成 "+doneN+" · AI 通过 "+aiPassN+" · 奖励 "+mins+" 分钟";
+    el.innerHTML=list.map(t=>{
+      const k=t.kind||"";
+      const kb = k==="read" ? `<span style="font-size:.68rem;background:#efe9fb;color:#6a4fb0;border-radius:4px;padding:1px 6px;flex:none">📖朗读</span>`
+               : k==="words" ? `<span style="font-size:.68rem;background:#efe9fb;color:#6a4fb0;border-radius:4px;padding:1px 6px;flex:none">🔤单词</span>` : "";
+      const r=aiRes[t.id];
+      const earned=!k && dispatchEarned(t.id);
+      const done=k ? !!(r && r.score>0) : earned;
+      const nameColor=done?"var(--green)":"#333";
+      let tag;
+      if(k && done){
+        const d=new Date(r.passedAt||Date.now());
+        tag=`<span style="flex:none;font-size:.72rem;color:var(--green);font-weight:700">🎤${r.score}分 · 已得 ${+t.minutes||0} 分钟（${d.getMonth()+1}/${d.getDate()}）</span>`;
+      }else{
+        tag=`<span style="flex:none;font-size:.72rem;color:#6a4fb0;font-weight:700">🎁${+t.minutes||0}分钟</span>`;
+      }
+      let ops;
+      if(k){
+        ops=`<button type="button" class="dp-del" data-id="${t.id}" title="删除任务" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:3px 8px;font-size:.72rem;color:#c0392b">删除</button>`;
+      }else if(earned){
+        ops=`<button type="button" class="dp-undo" data-id="${t.id}" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:3px 8px;font-size:.72rem;color:#666">撤销完成</button>
+             <button type="button" class="dp-del" data-id="${t.id}" title="删除任务" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:3px 8px;font-size:.72rem;color:#c0392b">删除</button>`;
+      }else{
+        ops=`<button type="button" class="dp-check" data-id="${t.id}" style="border:1px solid #1e8449;background:#1e8449;color:#fff;border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:600">打卡</button>
+             <button type="button" class="dp-del" data-id="${t.id}" title="删除任务" style="border:1px solid #ddd;background:#fff;border-radius:6px;padding:3px 8px;font-size:.72rem;color:#c0392b">删除</button>`;
+      }
+      return `<div class="td-task-row">
+        <div class="td-task-main">
+          <div class="td-task-title"><span style="color:${nameColor}${done?";font-weight:700":""}">${escapeHtml(t.name)}</span>${kb}</div>
+        </div>
+        ${tag}
+        <div class="td-task-ops">${ops}</div>
+      </div>`;
+    }).join("");
+    el.querySelectorAll(".dp-check").forEach(b=>b.addEventListener("click",()=>{
+      dispatchSetDone(b.dataset.id,true);
+      toast("✅ 已打卡，奖励时间将出现在孩子电脑（约10秒内）");
+      renderList();
+    }));
+    el.querySelectorAll(".dp-undo").forEach(b=>b.addEventListener("click",()=>{
+      if(!confirm("撤销完成将同时收回该任务未使用的奖励时间，确定？")) return;
+      dispatchSetDone(b.dataset.id,false);
+      toast("已撤销完成");
+      renderList();
+    }));
+    el.querySelectorAll(".dp-del").forEach(b=>b.addEventListener("click",()=>{
+      const t=dispatchTasks().find(x=>x.id===b.dataset.id); if(!t) return;
+      const earned=!t.kind && dispatchEarned(t.id);
+      if(!confirm(`删除任务「${t.name}」？`+((earned||t.kind)?"\n注意：删除后孩子端将无法继续使用该任务未使用的奖励时间。":""))) return;
+      state.config.dispatch.tasks = dispatchTasks().filter(x=>x.id!==b.dataset.id);
+      saveState(); toast("已删除「"+t.name+"」"); renderList();
+    }));
+  };
+  renderList();
+  renderReqList();
+  window.__dpRefresh = renderList;   // 同步桥拉到新回执时可刷新列表
+
+  let dpKind="";
+  const extraBox=mask.querySelector("#dpExtra");
+  const bindSelect="";
+  const renderExtra=()=>{
+    if(dpKind==="read"){
+      extraBox.innerHTML=`
+        <div style="display:flex;gap:12px;align-items:center;font-size:.78rem;color:#555;flex-wrap:wrap">
+          来源：
+          <label style="cursor:pointer"><input type="radio" name="dpSrc" value="paste" checked> 粘贴文章</label>
+          <label style="cursor:pointer"><input type="radio" name="dpSrc" value="ai"> ✨AI 按年级生成</label>
+        </div>
+        <div id="dpGenBox" style="display:none;background:#f4f0fb;border-radius:10px;padding:10px;margin-top:8px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.78rem;color:#555">
+            年级 <select id="dpGenGrade" style="border:1px solid var(--line);border-radius:6px;padding:4px;font-size:.78rem">
+              ${[1,2,3,4,5,6,7,8,9].map(g=>`<option value="${g}" ${g===3?"selected":""}>${["一年级","二年级","三年级","四年级","五年级","六年级","七年级","八年级","九年级"][g-1]}</option>`).join("")}
+            </select> ·
+            <span id="dpGenMode"></span>
+            <button type="button" id="dpGenBtn" class="m-ok" style="border:0;border-radius:7px;padding:5px 14px;font-size:.75rem;font-weight:600;cursor:pointer">✨ 生成短文</button>
+          </div>
+          <p id="dpGenMsg" style="font-size:.7rem;color:#888;margin:6px 0 0">生成后填入下方文本框，可手动修改再发布。</p>
+        </div>
+        <div style="font-size:.78rem;color:#666;margin-top:8px">朗读材料（大段文本，孩子电脑上自动分段评分）</div>
+        <textarea id="dpContent" rows="4" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:.85rem;font-family:inherit;box-sizing:border-box" placeholder="粘贴课文/阅读材料全文… 或用上方 AI 生成"></textarea>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px;font-size:.78rem;color:#555">
+          <label style="cursor:pointer"><input type="checkbox" id="dpQuiz"> 加理解问答（读后 AI 提问3题）</label>
+          <label style="cursor:pointer"><input type="checkbox" id="dpPoem"> 古诗词（字准确权重更高）</label>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:.78rem;color:#555;flex-wrap:wrap">
+          通过线 <input id="dpThr" type="number" min="60" max="95" value="80" style="width:58px;border:1px solid var(--line);border-radius:6px;padding:4px"> 分`;
+    }else if(dpKind==="words"){
+      extraBox.innerHTML=`
+        <div style="display:flex;gap:12px;align-items:center;font-size:.78rem;color:#555;flex-wrap:wrap">
+          来源：
+          <label style="cursor:pointer"><input type="radio" name="dpSrc" value="paste" checked> 手动输入</label>
+          <label style="cursor:pointer"><input type="radio" name="dpSrc" value="ai"> ✨AI 按年级生成（义务教育词表）</label>
+        </div>
+        <div id="dpGenBox" style="display:none;background:#f4f0fb;border-radius:10px;padding:10px;margin-top:8px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:.78rem;color:#555">
+            年级 <select id="dpGenGrade" style="border:1px solid var(--line);border-radius:6px;padding:4px;font-size:.78rem">
+              ${[1,2,3,4,5,6,7,8,9].map(g=>`<option value="${g}" ${g===3?"selected":""}>${["一年级","二年级","三年级","四年级","五年级","六年级","七年级","八年级","九年级"][g-1]}</option>`).join("")}
+            </select> ·
+            数量 <input id="dpGenCount" type="number" value="10" min="3" max="30" style="width:56px;border:1px solid var(--line);border-radius:6px;padding:4px"> 个
+            <button type="button" id="dpGenBtn" class="m-ok" style="border:0;border-radius:7px;padding:5px 14px;font-size:.75rem;font-weight:600;cursor:pointer">✨ 生成单词</button>
+          </div>
+          <p id="dpGenMsg" style="font-size:.7rem;color:#888;margin:6px 0 0">生成九年义务教育该年级必须掌握的单词，填入下方文本框，可手动增删。</p>
+        </div>
+        <div style="font-size:.78rem;color:#666;margin-top:8px">单词列表（每行一个，孩子电脑上逐词乱序评分 + 音标结构判断）</div>
+        <textarea id="dpContent" rows="4" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px;font-size:.85rem;font-family:inherit;box-sizing:border-box" placeholder="think&#10;through&#10;weather"></textarea>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;font-size:.78rem;color:#555;flex-wrap:wrap">
+          通过线 <input id="dpThr" type="number" min="60" max="95" value="80" style="width:58px;border:1px solid var(--line);border-radius:6px;padding:4px"> 分`;
+    }else extraBox.innerHTML="";
+    const syncSrc=()=>{ const box=mask.querySelector("#dpGenBox"); if(!box) return;
+      box.style.display=((mask.querySelector('input[name="dpSrc"]:checked')||{}).value==="ai")?"":"none"; };
+    mask.querySelectorAll('input[name="dpSrc"]').forEach(r=>r.addEventListener("change",syncSrc));
+    syncSrc();
+    const gb=mask.querySelector("#dpGenBtn"); if(gb) gb.addEventListener("click",()=>aiGenerate(dpKind));
+    const pm=mask.querySelector("#dpPoem"); if(pm) pm.addEventListener("change",updateGenMode);
+    updateGenMode();
+  };
+  const updateGenMode=()=>{
+    const mode=mask.querySelector("#dpGenMode"); if(!mode) return;
+    const poem=(mask.querySelector("#dpPoem")||{checked:false}).checked;
+    mode.innerHTML = poem
+      ? '共 <input id="dpGenCount" type="number" value="3" min="1" max="6" style="width:50px;border:1px solid var(--line);border-radius:6px;padding:4px"> 首课本古诗'
+      : '约 <input id="dpGenWords" type="number" value="200" min="60" max="600" step="20" style="width:64px;border:1px solid var(--line);border-radius:6px;padding:4px"> 字 · 分 <input id="dpGenParas" type="number" value="2" min="1" max="5" style="width:50px;border:1px solid var(--line);border-radius:6px;padding:4px"> 段';
+    const btn=mask.querySelector("#dpGenBtn");
+    if(btn) btn.textContent = poem ? "✨ 生成课本古诗词" : "✨ 生成短文";
+  };
+  const aiGenerate=async(kind)=>{
+    const msg=mask.querySelector("#dpGenMsg");
+    msg.textContent="生成中…（约几秒）";
+    try{
+      const poem=(mask.querySelector("#dpPoem")||{checked:false}).checked;
+      const grade=+(mask.querySelector("#dpGenGrade").value||3);
+      const body=kind==="words"
+        ? {type:"words", grade, count:+(mask.querySelector("#dpGenCount").value||10)}
+        : poem
+        ? {type:"poem", grade, count:+((mask.querySelector("#dpGenCount")||{value:3}).value||3), words:+(mask.querySelector("#dpGenWords")||{value:120}).value||120}
+        : {type:"read", grade, words:+((mask.querySelector("#dpGenWords")||{value:200}).value||200), paras:+((mask.querySelector("#dpGenParas")||{value:2}).value||2)};
+      const r=await fetch("/api/ai/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+      const j=await r.json();
+      if(j.error) throw new Error(j.error);
+      if(kind==="read") mask.querySelector("#dpContent").value=(j.text||"").trim();
+      else mask.querySelector("#dpContent").value=(j.words||[]).join("\n");
+      msg.textContent="✅ 已生成，可直接修改后发布";
+    }catch(e){ msg.textContent="❌ 生成失败："+e.message; }
+  };
+  mask.querySelectorAll(".dp-kind").forEach(ch=>ch.addEventListener("click",()=>{
+    mask.querySelectorAll(".dp-kind").forEach(c=>c.classList.toggle("on", c===ch));
+    dpKind=ch.dataset.k; renderExtra();
+  }));
+  renderExtra();
+
+  mask.querySelectorAll(".dp-min").forEach(ch=>ch.addEventListener("click",()=>{
+    mask.querySelectorAll(".dp-min").forEach(c=>c.classList.toggle("on", c===ch));
+    mask.querySelector("#dpMin").value=ch.dataset.m;
+  }));
+  mask.querySelector("#dpAdd").addEventListener("click",()=>{
+    const name=(mask.querySelector("#dpName").value||"").trim();
+    const m=Math.round(+mask.querySelector("#dpMin").value||0);
+    const err=mask.querySelector("#dpErr");
+    if(!name){ err.textContent="请填写任务名称"; return; }
+    if(!(m>0)){ err.textContent="奖励时长需大于 0 分钟"; return; }
+    if(m>240){ err.textContent="单任务奖励最长 240 分钟"; return; }
+    err.textContent="";
+    let taskName=name;
+    if(dpKind && !taskName){
+      const c0=(mask.querySelector("#dpContent").value||"").trim();
+      const first=(c0.split(/\r?\n/).find(l=>l.trim())||"").trim();
+      taskName=first.slice(0,20);   // 未填名称 → 取内容第一行
+      if(!taskName){ err.textContent="请填写任务名称或先生成/粘贴内容"; return; }
+    }
+    const task={id:"dp"+Date.now().toString(36), name:taskName, minutes:m, createdAt:new Date().toISOString()};
+    if(dpKind){
+      const content=(mask.querySelector("#dpContent").value||"").trim();
+      const thr=Math.min(95,Math.max(60,Math.round(+mask.querySelector("#dpThr").value||80)));
+      if(dpKind==="read"){
+        if(content.replace(/\s/g,"").length<20){ err.textContent="朗读材料太短（至少 20 字）"; return; }
+        task.kind="read"; task.content=content; task.threshold=thr;
+        task.quiz=!!mask.querySelector("#dpQuiz").checked;
+        task.poem=!!mask.querySelector("#dpPoem").checked;
+      }else{
+        const ws=content.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
+        if(ws.length<3){ err.textContent="至少输入 3 个单词（每行一个）"; return; }
+        if(ws.length>30){ err.textContent="一次最多 30 个单词"; return; }
+        task.kind="words"; task.content=ws; task.threshold=thr;
+      }
+    }
+    dispatchTasks().push(task);
+    saveState();
+    mask.querySelector("#dpName").value="";
+    toast(task.kind?("📤 已发布 AI 评分任务「"+name+"」（≥"+(task.threshold||80)+"分得 "+m+" 分钟，不计奖金）")
+                :("📤 已发布「"+name+"」（奖励 "+m+" 分钟电脑时间，不计奖金）"));
+    renderList();
+  });
+  mask.querySelector("#dpName").addEventListener("keydown",e=>{ if(e.key==="Enter") mask.querySelector("#dpAdd").click(); });
+}
+$("#btnDispatch").addEventListener("click",openDispatch);
+
+/* ================= AI 设置（对话模型走云端 OpenAI 兼容；key 存独立 AI Gist） =================
+   语音识别已内置孩子电脑本地引擎（阿里 Paraformer 中文 + Whisper 英文，按任务语言自动选择，离线可用）。
+   孩子电脑只拿到 AI Gist 的 raw 地址（保存在主数据 config.ai.cfgUrl），
+   接口密钥本身仅存于独立 Gist，孩子端直连 AI 服务商进行出题/判题。 */
+async function saveAiCfgToGist(cfg){
+  const c=syncCfg();
+  if(!(c.gistId && c.token)) throw new Error("本机云同步未启用：请先点顶栏 ☁️ 完成配置");
+  const files={["ai-config.json"]:{content: JSON.stringify(cfg, null, 2)}};
+  let gistId=state.config.ai.cfgGistId||null, owner=null;
+  const H={Authorization:"Bearer "+c.token, Accept:"application/vnd.github+json", "Content-Type":"application/json"};
+  if(gistId){
+    const r=await fetch(`${c.apiBase}/gists/${gistId}`,{method:"PATCH",headers:H,body:JSON.stringify({files})});
+    if(!r.ok) throw new Error("更新 AI Gist 失败 HTTP "+r.status);
+  }else{
+    const r=await fetch(`${c.apiBase}/gists`,{method:"POST",headers:H,
+      body:JSON.stringify({description:"PCGuardian AI 接入配置（勿手动编辑）", public:false, files})});
+    if(!r.ok) throw new Error("创建 AI Gist 失败 HTTP "+r.status+"（token 可能缺少创建 Gist 权限）");
+    const j=await r.json(); gistId=j.id; owner=(j.owner||{}).login;
+  }
+  if(!owner){
+    const r=await fetch(`${c.apiBase}/gists/${gistId}`,{headers:H});
+    owner=((await r.json()).owner||{}).login;
+  }
+  state.config.ai={cfgGistId:gistId,
+    cfgUrl:`https://gist.githubusercontent.com/${owner}/${gistId}/raw/ai-config.json`};
+  saveState();
+}
+function openAISettings(){
+  const cur=state.config.ai;
+  const mask=document.createElement("div"); mask.className="td-mask";
+  mask.innerHTML=`<div class="td-drawer">
+    <div class="td-header">
+      <h2>🤖 AI 设置</h2>
+      <button type="button" class="td-btn-close" id="aiClose" title="关闭">✕</button>
+    </div>
+    <div class="td-body" style="max-width:560px">
+    <div class="td-grp-card" style="border-left:4px solid #0d9488">
+    <div style="padding:10px 14px">
+    <p style="font-size:.74rem;color:#666;margin:4px 0 10px">
+      语音识别已<b>内置在孩子电脑本地</b>（阿里 Paraformer 中文 + Whisper 英文，按任务语言自动选择，离线可用），
+      此处只需配置<b>对话模型</b>（朗读+问答任务的出题/判题，OpenAI 兼容）。
+      密钥保存在<b>独立的 AI Gist</b>，不进入打卡数据与导出备份；孩子电脑只读该 Gist 地址。
+      ${cur.cfgUrl?'<br><span style="color:var(--green)">● 已配置（云端生效中）</span>':'<br><span style="color:#c0392b">○ 未配置：发布含问答的 AI 任务前需先填写并保存</span>'}</p>
+    <label style="font-size:.78rem;color:var(--ink2)">接口地址 endpoint（如 https://open.bigmodel.cn/api/paas/v4）</label>
+    <input id="aiEp" type="text" placeholder="https://api.siliconflow.cn/v1" style="width:100%">
+    <label style="font-size:.78rem;color:var(--ink2)">API Key（建议使用设了消费上限的专用 key）</label>
+    <input id="aiKey" type="text" placeholder="sk-…" style="width:100%">
+    <label style="font-size:.78rem;color:var(--ink2)">对话模型（出题/判题，如 glm-4-flash / qwen 系列）</label>
+    <input id="aiChat" type="text" placeholder="glm-4-flash" style="width:100%">
+    <p class="m-err" id="aiMsg" style="min-height:1.2em"></p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+      <button type="button" id="aiCopy" class="m-cancel">复制JSON</button>
+      <button type="button" id="aiTest" class="m-cancel">测试连接</button>
+      <button type="button" id="aiSave" class="m-ok">保存到云端</button>
+    </div>
+    </div></div>
+    </div>`;
+  document.body.appendChild(mask);
+  requestAnimationFrame(()=>mask.classList.add("show"));
+  const close=()=>{ mask.classList.remove("show"); setTimeout(()=>mask.remove(),260); };
+  const born=Date.now();          // 出生保护：移动端点按钮的第二次合成点击会落在遮罩上，500ms 内忽略
+  mask.addEventListener("click",e=>{ if(e.target===mask && Date.now()-born>500) close(); });
+  document.getElementById("aiClose").addEventListener("click",close);
+  const vals=()=>({
+    endpoint:(mask.querySelector("#aiEp").value||"").trim(),
+    apiKey:(mask.querySelector("#aiKey").value||"").trim(),
+    chatModel:(mask.querySelector("#aiChat").value||"").trim(),
+  });
+  const msg=(t,isErr)=>{const el=mask.querySelector("#aiMsg"); el.textContent=t||""; el.style.color=isErr?"var(--red)":"var(--green)";};
+  mask.querySelector("#aiCopy").onclick=()=>{
+    const c=vals();
+    navigator.clipboard&&navigator.clipboard.writeText(JSON.stringify(c,null,2));
+    msg("已复制 JSON（可手工创建 ai-config.json 用于本地联调）");
+  };
+  mask.querySelector("#aiTest").onclick=async()=>{
+    const c=vals();
+    if(!c.endpoint||!c.apiKey||!c.chatModel){ msg("请先填 endpoint / API Key / 对话模型",true); return; }
+    msg("测试中…");
+    try{
+      if(window.__lanSync){          // 联调服务器中转（无 CORS 限制，支持本地模型）
+        const r=await fetch("/api/ai/test",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(c)});
+        const j=await r.json();
+        if(!j.ok) throw new Error(j.error||"未知错误");
+        msg("✅ 接口可用（服务器中转）");
+        return;
+      }
+      const r=await fetch(c.endpoint.replace(/\/$/,"")+"/chat/completions",{method:"POST",
+        headers:{Authorization:"Bearer "+c.apiKey,"Content-Type":"application/json"},
+        body:JSON.stringify({model:c.chatModel,messages:[{role:"user",content:"回复ok"}],max_tokens:8})});
+      if(!r.ok) throw new Error("HTTP "+r.status);
+      msg("✅ 接口可用");
+    }catch(e){ msg("❌ 连接失败："+e.message,true); }
+  };
+  mask.querySelector("#aiSave").onclick=async()=>{
+    const c=vals();
+    if(!c.endpoint||!c.apiKey||!c.chatModel){ msg("请填写完整（endpoint / API Key / 对话模型）",true); return; }
+    msg("保存中…");
+    try{
+      if(window.__lanSync){        // 测试环境：保存到联调服务器（孩子端同款配置文件）
+        const r=await fetch("/api/aicfg",{method:"POST",headers:{"Content-Type":"application/json"},
+          body:JSON.stringify(c)});
+        const j=await r.json();
+        if(j.error) throw new Error(j.error);
+        state.config.ai={cfgUrl:"C:/PCGuardian/localtest/ai-config.json"};
+        saveState();
+        msg("✅ 已保存到测试服务器（孩子端约10秒内生效）");
+        toast("🤖 AI 配置已保存（测试环境）");
+        return;
+      }
+      await saveAiCfgToGist(c);
+      msg("✅ 已保存到云端 AI Gist（约10秒内同步到孩子电脑）");
+      toast("🤖 AI 配置已保存到云端");
+    }catch(e){ msg("保存失败："+e.message,true); }
   };
 }
-$("#btnPCGuard").addEventListener("click",openPCGuard);
+$("#btnAI").addEventListener("click",openAISettings);
 $("#btnImport").addEventListener("click",()=>$("#importFile").click());
 $("#importFile").addEventListener("change",e=>{
   const f=e.target.files[0]; if(!f) return;
@@ -1005,6 +1441,63 @@ $("#importFile").addEventListener("change",e=>{
   r.readAsText(f); e.target.value="";
 });
 
+/* ---- 批量导入任务：一个 .md/.txt = 一个任务（首行=标题，其余=内容，自动分段/判定单词或文章） ---- */
+// 常驻隐藏 input（抽屉是动态创建的，不能依赖加载时存在的元素）
+const _importTasksInput = document.createElement("input");
+_importTasksInput.type = "file";
+_importTasksInput.accept = ".md,.txt,text/markdown,text/plain";
+_importTasksInput.multiple = true;
+_importTasksInput.style.display = "none";
+document.body.appendChild(_importTasksInput);
+// 事件委托：按钮在「电脑任务」抽屉里动态出现，用委托绑定避免加载时报 null
+document.addEventListener("click", e=>{
+  const b = e.target && e.target.closest && e.target.closest("#btnImportTasks");
+  if (b) { e.preventDefault(); _importTasksInput.click(); }
+});
+_importTasksInput.addEventListener("change",e=>{
+  const files=[...e.target.files||[]]; if(!files.length) return;
+  let ok=0, fail=[], done=0;
+  files.forEach(f=>{
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const text=String(r.result||"").replace(/\r\n/g,"\n").trim();
+        if(!text) throw new Error("空文件");
+        const lines=text.split("\n");
+        const firstIdx=lines.findIndex(l=>l.trim());
+        const title=(lines[firstIdx]||"").replace(/^#\s*/,"").trim().slice(0,30) || f.name.replace(/\.(md|txt)$/i,"");
+        const contentLines=lines.slice(firstIdx+1).map(l=>l.replace(/\s+$/,"")).filter(l=>l.trim()!=="");
+        if(!contentLines.length) throw new Error("只有标题没有内容");
+        const wordLines=contentLines.map(l=>l.trim()).filter(Boolean);
+        const isWords = wordLines.length>=3
+          && wordLines.every(l=>/^[A-Za-z][A-Za-z\u00C0-\u024F\u2019\'-]{0,25}$/.test(l))
+          && wordLines.length<=60;
+        const task={id:"dp"+Date.now().toString(36)+Math.floor(Math.random()*1e4),
+                    name:title,
+                    minutes:isWords?(Math.max(5,Math.min(15,wordLines.length))):20,
+                    createdAt:new Date().toISOString()};
+        if(isWords){
+          task.kind="words"; task.content=wordLines; task.threshold=80;
+        }else{
+          task.kind="read";
+          task.content=contentLines.map(l=>l.replace(/^#{1,6}\s+/,"").replace(/^-{3,}$/,"").trim()).filter(l=>l!=="").join("\n\n");
+          task.threshold=80;
+        }
+        dispatchTasks().push(task);
+        ok++;
+      }catch(err){ fail.push(f.name+"："+err.message); }
+      done++;
+      if(done===files.length){
+        if(ok) saveState();
+        toast(ok?("📚 已导入 "+ok+" 个任务"+(fail.length?("，失败 "+fail.length):"")):"导入失败");
+        if(fail.length) alert("以下文件导入失败：\n"+fail.join("\n"));
+      }
+    };
+    r.onerror=()=>{ fail.push(f.name+"：读取失败"); done++; };
+    r.readAsText(f,"utf-8");
+  });
+  e.target.value="";
+});
 /* ---- File System Access：绑定真实 JSON 文件（PC/平板 Chrome/Edge） ---- */
 const FS_OK = typeof window.showSaveFilePicker==="function";
 if(FS_OK) $("#btnBind").style.display="";
@@ -1059,7 +1552,8 @@ function showModal({title, fields, hint, onOk}){
     <div class="m-actions"><button class="m-cancel">取消</button><button class="m-ok">确定</button></div></div>`;
   document.body.appendChild(mask);
   const close=()=>mask.remove();
-  mask.addEventListener("click",e=>{ if(e.target===mask) close(); });
+  const born=Date.now();          // 出生保护：移动端点按钮的第二次合成点击会落在遮罩上，500ms 内忽略
+  mask.addEventListener("click",e=>{ if(e.target===mask && Date.now()-born>500) close(); });
   mask.querySelectorAll(".chip").forEach(ch=>ch.addEventListener("click",()=>{
     const inp=mask.querySelector("#"+ch.dataset.chipFor); if(inp) inp.value=ch.dataset.val;
     mask.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on", c===ch));
@@ -1093,13 +1587,13 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":
     setTimeout(()=>toast("☁️ 云同步配置成功，本机已自动开启"), 300);
   }
 })();
-/* ================= 任务与金额管理抽屉 ================= */
+/* ================= 任务管理抽屉 ================= */
 (function initTaskManagerDrawer(){
   const drawerHtml = `
   <div class="td-mask" id="tdMask">
     <div class="td-drawer">
       <div class="td-header">
-        <h2>⚙️ 任务与金额管理</h2>
+        <h2>⚙️ 任务管理</h2>
         <button class="td-btn-add" id="tdBtnAdd">➕ 新增任务</button>
         <button class="td-btn-reset" id="tdBtnReset" title="恢复预设默认任务与金额">🔄 恢复默认</button>
         <button class="td-btn-close" id="tdBtnClose" title="关闭">✕</button>
@@ -1117,7 +1611,8 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":
     btnManage.addEventListener("click", openTaskManager);
   }
   document.getElementById("tdBtnClose").addEventListener("click", closeTaskManager);
-  tdMask.addEventListener("click", e=>{ if(e.target===tdMask) closeTaskManager(); });
+  const tdBorn=Date.now();
+  tdMask.addEventListener("click", e=>{ if(e.target===tdMask && Date.now()-tdBorn>500) closeTaskManager(); });
   document.getElementById("tdBtnAdd").addEventListener("click", ()=>openTaskEditModal(null));
   document.getElementById("tdBtnReset").addEventListener("click", resetTasksToDefault);
 
