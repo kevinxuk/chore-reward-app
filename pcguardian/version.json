@@ -1,8 +1,8 @@
 {
-  "version": "2026-10-25.5",
+  "version": "2026-10-25.6",
   "files": {
     "PCVoiceScore.pyw": {
-      "sha256": "f29ecd2cc10fd84a861b01b8adc763f4fb6a085c82788f3338578dd6d1032b4d"
+      "sha256": "341684d73d5fcffbc50161df6b0b5759436c5c67d87e19b4cdc7c3ca8f574e31"
     },
     "guardian.pyw": {
       "sha256": "78e181d057ce3aeeb732dd0ebdf3c1a67433b02e3ecfb1ba562eff279733390f"
