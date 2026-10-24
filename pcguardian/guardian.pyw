@@ -1722,6 +1722,21 @@ class Guardian:
 
     # ---------- 启动 ----------
     def run(self):
+        if "--selftest-voice" in sys.argv:
+            # 打包验收：验证冻结环境内 PCVoiceScore 及语音引擎可加载（不启动界面）
+            try:
+                S = self._score_module()
+                zh = S.LocalASR().available("zh"); en = S.LocalASR().available("en")
+                w = S.word_score("think", "sink")        # 音标结构（pronouncing）
+                py = S._py("读") is not None             # 拼音容错（pypinyin）
+                self.log.write("[selftest] 语音组件 OK；模型 zh=%s en=%s；音标评分=%s 拼音=%s"
+                               % (zh, en, w, py))
+                print("[selftest] OK zh=%s en=%s phoneme=%s pinyin=%s" % (zh, en, w, py))
+            except Exception:
+                import traceback
+                self.log.write("[selftest] FAIL\n" + traceback.format_exc())
+                print("[selftest] FAIL（详见 guardian.log）")
+            return
         if "--install" in sys.argv:
             self.install_startup(); return
         if "--remove" in sys.argv:
