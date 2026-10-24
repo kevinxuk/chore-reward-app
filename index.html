@@ -1237,25 +1237,90 @@ function openDispatch(){
     const btn=mask.querySelector("#dpGenBtn");
     if(btn) btn.textContent = poem ? "✨ 生成课本古诗词" : "✨ 生成短文";
   };
+  const _GEN_GRADES=["一年级","二年级","三年级","四年级","五年级","六年级","七年级","八年级","九年级"];
+  const _GEN_POEMS={
+    1:"《咏鹅》骆宾王、《静夜思》李白、《悯农（其二）》李绅、《春晓》孟浩然、《村居》高鼎",
+    2:"《登鹳雀楼》王之涣、《望庐山瀑布》李白、《夜宿山寺》李白、《敕勒歌》北朝民歌、《梅花》王安石",
+    3:"《山行》杜牧、《赠刘景文》苏轼、《夜书所见》叶绍翁、《望天门山》李白、《饮湖上初晴后雨》苏轼、《望洞庭》刘禹锡、《咏柳》贺知章、《春日》朱熹、《乞巧》林杰、《嫦娥》李商隐",
+    4:"《题西林壁》苏轼、《暮江吟》白居易、《出塞》王昌龄、《凉州词》王翰、《夏日绝句》李清照、《别董大》高适",
+    5:"《蝉》虞世南、《示儿》陆游、《题临安邸》林升、《己亥杂诗》龚自珍、《山居秋暝》王维、《枫桥夜泊》张继",
+    6:"《宿建德江》孟浩然、《六月二十七日望湖楼醉书》苏轼、《西江月·夜行黄沙道中》辛弃疾、《过故人庄》孟浩然、《春夜喜雨》杜甫、《回乡偶书》贺知章",
+  };
+  let _aiCfgCache=null;
+  const getAiCfg=async()=>{
+    if(_aiCfgCache) return _aiCfgCache;
+    const url=(state.config.ai||{}).cfgUrl;
+    if(!url) throw new Error("请先在「🤖 AI设置」完成配置并保存");
+    const r=await fetch(url+"?t="+Date.now());
+    if(!r.ok) throw new Error("读取 AI 配置失败（AI Gist 不可达）");
+    _aiCfgCache=await r.json();
+    return _aiCfgCache;
+  };
+  const genPrompt=(kind,poem,grade,words,paras,count)=>{
+    const g=_GEN_GRADES[grade-1]||_GEN_GRADES[2];
+    if(kind==="words") return {sys:"你是小学英语老师，只输出单词列表，每行一个，不要编号、音标或中文解释。",
+      user:"请列出中国九年义务教育"+g+"学生需要掌握的英语单词，共"+count+"个。"};
+    if(poem) return {sys:"你是小学语文老师。你只输出用于朗读的古诗词材料，绝不输出解释、点评或生成说明。",
+      user:"请从中国小学"+g+"语文教材中选取"+count+"首真实存在的经典古诗词（必须是教材里的名篇，例如："+(_GEN_POEMS[grade]||_GEN_POEMS[3])+
+           "。严禁虚构、改编或拼凑任何诗句；每首诗你必须百分之百确定原文无误），生成一份朗读材料。每首格式：《诗名》朝代·作者，另起一行输出诗文原文（保留标点，与教材原文完全一致），每首之间空一行。所有诗加起来正文不少于"+words+"字。"};
+    return {sys:"你是小学语文老师，为学生的朗读练习生成材料。只输出正文，不要标题、序号或解释。",
+      user:"请生成一篇适合"+g+"小学生朗读的中文短文：全文约"+words+"字，分成"+paras+"个自然段（段与段之间空一行）。内容积极向上、贴近孩子生活，句子简短、标点完整。"};
+  };
+  const parseWordList=(s)=>{
+    const BS=String.fromCharCode(92);
+    const reLine=new RegExp("^["+BS+"d]+[.、)"+BS+"s]*");
+    return (s||"").split(/[\r\n]+/).map(l=>l.replace(reLine,"").replace(/\*|_/g,"").trim())
+      .filter(l=>/^[A-Za-z][A-Za-z'\-]{0,30}$/.test(l)).slice(0,30);
+  };
   const aiGenerate=async(kind)=>{
     const msg=mask.querySelector("#dpGenMsg");
-    msg.textContent="生成中…（约几秒）";
+    msg.textContent="生成中…（约几秒到十几秒）";
     try{
       const poem=(mask.querySelector("#dpPoem")||{checked:false}).checked;
       const grade=+(mask.querySelector("#dpGenGrade").value||3);
-      const body=kind==="words"
-        ? {type:"words", grade, count:+(mask.querySelector("#dpGenCount").value||10)}
-        : poem
-        ? {type:"poem", grade, count:+((mask.querySelector("#dpGenCount")||{value:3}).value||3), words:+(mask.querySelector("#dpGenWords")||{value:120}).value||120}
-        : {type:"read", grade, words:+((mask.querySelector("#dpGenWords")||{value:200}).value||200), paras:+((mask.querySelector("#dpGenParas")||{value:2}).value||2)};
-      const r=await fetch("/api/ai/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
-      const j=await r.json();
-      if(j.error) throw new Error(j.error);
-      if(kind==="read") mask.querySelector("#dpContent").value=(j.text||"").trim();
-      else mask.querySelector("#dpContent").value=(j.words||[]).join("\n");
+      const wordsN=+((mask.querySelector("#dpGenWords")||{value:200}).value||200);
+      const paras=+((mask.querySelector("#dpGenParas")||{value:2}).value||2);
+      const count=+((mask.querySelector("#dpGenCount")||{value:kind==="read"?3:10}).value||10);
+      let text="", words=null;
+      if(window.__lanSync){
+        const body=kind==="words"
+          ? {type:"words", grade, count}
+          : poem
+          ? {type:"poem", grade, count, words:wordsN}
+          : {type:"read", grade, words:wordsN, paras};
+        const r=await fetch("/api/ai/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+        const j=await r.json();
+        if(j.error) throw new Error(j.error);
+        text=j.text||""; words=j.words||null;
+      }else{
+        const cfg=await getAiCfg();
+        const p=genPrompt(kind,poem,grade,wordsN,paras,count);
+        const r=await fetch(cfg.endpoint.replace(/\/$/,"")+"/chat/completions",{method:"POST",
+          headers:{Authorization:"Bearer "+cfg.apiKey,"Content-Type":"application/json"},
+          body:JSON.stringify({model:cfg.chatModel,messages:[{role:"system",content:p.sys},{role:"user",content:p.user}],temperature:0.8})});
+        const raw=await r.text();
+        let j; try{ j=JSON.parse(raw); }catch(e){ throw new Error("接口返回异常："+raw.slice(0,60)); }
+        if(!r.ok) throw new Error((j.error&&j.error.message)||("HTTP "+r.status));
+        const content=((j.choices||[])[0]||{}).message?.content||"";
+        if(kind==="words") words=parseWordList(content);
+        else text=content.trim();
+      }
+      if(kind==="words"){
+        if(!words||!words.length) throw new Error("未得到有效单词列表，请重试");
+        mask.querySelector("#dpContent").value=words.join("\n");
+      }else{
+        if(!text) throw new Error("生成内容为空，请重试");
+        mask.querySelector("#dpContent").value=text;
+      }
       msg.textContent="✅ 已生成，可直接修改后发布";
-    }catch(e){ msg.textContent="❌ 生成失败："+e.message; }
+    }catch(e){
+      let m=e.message||String(e);
+      if(m.indexOf("Failed to fetch")>=0||m.indexOf("NetworkError")>=0)
+        m="无法直连大模型（浏览器跨域限制）。可改用局域网联调环境生成，或换支持浏览器直连的服务商";
+      msg.textContent="❌ 生成失败："+m;
+    }
   };
+
   mask.querySelectorAll(".dp-kind").forEach(ch=>ch.addEventListener("click",()=>{
     mask.querySelectorAll(".dp-kind").forEach(c=>c.classList.toggle("on", c===ch));
     dpKind=ch.dataset.k; renderExtra();
