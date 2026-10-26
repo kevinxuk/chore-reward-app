@@ -68,7 +68,7 @@ DEFAULT_CFG = {
     "update_hours": 6,           # 升级检查间隔（小时）；启动约 90 秒后也会先查一次
     "eye_break_minutes": 35,     # 护眼：每使用 N 分钟强制休息（0 = 关闭护眼模式）
     "eye_break_seconds": 180,    # 护眼休息时长（秒）；休息期间使用倒计时冻结
-    "media_dir": r"C:\PCGuardian\media",   # 本地媒体文件夹：家长拷入音视频/MD 文档，孩子端自动扫描成任务
+    "media_dir": "",             # 本地媒体文件夹：默认 <程序目录>\media\（可设绝对路径覆盖）
 }
 
 # ---------------------------------------------------------------- 基础工具
@@ -1633,7 +1633,7 @@ class Guardian:
             return False
 
     def _media_dir(self):
-        return str(self.cfg.get("media_dir") or r"C:\PCGuardian\media")
+        return str(self.cfg.get("media_dir") or os.path.join(script_dir(), "media"))
 
     def _scan_local_tasks(self):
         """扫描本地媒体文件夹——按类型分文件夹存放（递归，子文件夹 = 合集）：
