@@ -27,10 +27,12 @@ PC Guardian —— 儿童电脑使用时间管控程序
 """
 import json
 import os
+import re
 import sys
 import time
 import queue
 import ctypes
+import hashlib
 import datetime
 import subprocess
 import threading
@@ -42,6 +44,9 @@ import tkinter as tk
 APP_NAME = "PCGuardian"
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 RUN_VALUE = "PCGuardian"
+UPDATE_REPO_RAW = "https://raw.githubusercontent.com/kevinxuk/chore-reward-app/main/pcguardian"
+UPDATE_REPO_JSD = "https://cdn.jsdelivr.net/gh/kevinxuk/chore-reward-app@main/pcguardian"
+UPDATE_FILES = ("PCVoiceScore.pyw", "guardian.pyw")
 
 DEFAULT_CFG = {
     # 打卡数据的云端地址（Gist raw，免认证只读、永远指向最新版本）
@@ -59,6 +64,11 @@ DEFAULT_CFG = {
     "ai_max_attempts": 5,        # AI 评分任务每天每任务默认尝试次数上限（任务里可覆盖）
     "dry_run": False,            # True = 只打印不真关机（--demo 强制为 True）
     "log": True,
+    "auto_update": True,         # 自动升级：检测 GitHub 上的新版本并自动下载安装
+    "update_hours": 6,           # 升级检查间隔（小时）；启动约 90 秒后也会先查一次
+    "eye_break_minutes": 35,     # 护眼：每使用 N 分钟强制休息（0 = 关闭护眼模式）
+    "eye_break_seconds": 180,    # 护眼休息时长（秒）；休息期间使用倒计时冻结
+    "media_dir": r"C:\PCGuardian\media",   # 本地媒体文件夹：家长拷入音视频/MD 文档，孩子端自动扫描成任务
 }
 
 # ---------------------------------------------------------------- 基础工具
@@ -66,6 +76,92 @@ def script_dir():
     if getattr(sys, "frozen", False):          # PyInstaller exe：用 exe 所在目录
         return os.path.dirname(os.path.abspath(sys.executable))
     return os.path.dirname(os.path.abspath(sys.argv[0] or __file__))
+
+def _audio_cfg_path():
+    return os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"),
+                        "PCGuardian", "audio.json")
+
+def load_audio_cfg():
+    """音频硬件配置（麦克风设备选择等），存孩子电脑 APPDATA——不入 Gist、不进备份。"""
+    try:
+        with open(_audio_cfg_path(), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_audio_cfg(d):
+    try:
+        p = _audio_cfg_path()
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(d, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+# ---- 本地媒体文件夹：家长拷入音视频/MD 文档，孩子端自动扫描成任务 ----
+AUDIO_EXT = (".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg", ".wma")
+VIDEO_EXT = (".mp4", ".avi", ".mkv", ".mov", ".webm", ".wmv")
+_WORD_LINE_RE = re.compile(r"^[A-Za-z][A-Za-z'\-]{0,30}$")
+
+def _local_id(prefix, path):
+    """本地任务稳定 ID：同文件内容/修改时间不变则 ID 不变（评分结果、奖励不重复）。"""
+    try:
+        st = os.stat(path)
+        key = "%s|%d|%d" % (path, st.st_size, int(st.st_mtime))
+    except OSError:
+        key = path
+    return prefix + hashlib.md5(key.encode("utf-8")).hexdigest()[:8]
+
+def _video_duration_ms(path):
+    """视频总时长（毫秒）；无法解析返回 0。"""
+    try:
+        import cv2
+        cap = cv2.VideoCapture(path)
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        n = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+        cap.release()
+        if n > 0 and fps > 0:
+            return int(n / fps * 1000)
+    except Exception:
+        pass
+    return 0
+
+def _watch_enough(duration_ms, watched_s):
+    """防跳看判定：累计观看秒数是否达到 视频时长−1分钟容差（至少看 1 分钟）；
+    时长未知要求满 20 分钟。不足 = 有跳过嫌疑，不发奖励。"""
+    if duration_ms and duration_ms > 0:
+        need = max(60.0, (duration_ms - 60000) / 1000.0)
+    else:
+        need = 1200.0
+    return watched_s + 1.0 >= need, max(0.0, need - watched_s)
+
+def parse_local_md(path):
+    """media 文件夹里的 .md 文件 → 本地 AI 任务。
+    首行 = 标题（# 号可有可无）；正文全英文单词行（3~60 行）→ 单词任务，否则朗读任务。"""
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            raw = [l.rstrip() for l in f.readlines()]
+    except Exception:
+        return None
+    nonempty = [i for i, l in enumerate(raw) if l.strip()]
+    if not nonempty:
+        return None
+    t0 = nonempty[0]
+    title = raw[t0].lstrip("#").strip() or "未命名"
+    body = []
+    for l in raw[t0 + 1:]:
+        s = l.strip().lstrip("#").strip()
+        if s and not set(s) <= set("-_* "):
+            body.append(s)
+    if not body:
+        return None
+    if 3 <= len(body) <= 60 and all(_WORD_LINE_RE.match(b) for b in body):
+        return {"kind": "words", "name": title[:30], "content": body}
+    content = "\n".join(body)
+    if len(content.replace(" ", "").replace("\n", "")) < 20:
+        return None
+    return {"kind": "read", "name": title[:30], "content": content}
 
 def load_cfg():
     cfg = dict(DEFAULT_CFG)
@@ -267,8 +363,14 @@ def _reward_session_paths():
         pass
     return paths
 
-def save_reward_session(end_time, unlock_start):
-    doc = json.dumps({"date": today_key(), "end_time": end_time, "unlock_start": unlock_start})
+def save_reward_session(end_time, unlock_start, remaining=None):
+    """remaining 有值 = 暂停语义：保存「剩余秒数」而非结束时间点——
+    恢复时从当前时间重新起算，暂停期间墙钟流逝不扣时间（否则暂停等于没暂停）。"""
+    doc = {"date": today_key(), "end_time": end_time, "unlock_start": unlock_start}
+    if remaining is not None:
+        doc["paused"] = True
+        doc["remaining"] = int(remaining)
+    s = json.dumps(doc)
     for p in _reward_session_paths():
         try:
             os.makedirs(os.path.dirname(p), exist_ok=True)
@@ -277,7 +379,7 @@ def save_reward_session(end_time, unlock_start):
             except FileNotFoundError:
                 pass
             with open(p, "w", encoding="utf-8") as f:
-                f.write(doc)
+                f.write(s)
             _hide_file(p)
         except Exception:
             pass
@@ -304,14 +406,25 @@ def load_reward_session(grace_seconds=7200):
             pass
     if not best:
         return None, None
+    now = time.time()
+    if best.get("paused"):
+        # 暂停语义：存的是「剩余秒数」，跨天/跨重启都从当前时间重新起算
+        try:
+            remaining = float(best.get("remaining") or 0)
+        except Exception:
+            remaining = 0
+        if remaining <= 0:
+            clear_reward_session()
+            return None, None
+        return "paused", remaining
     try:
         end = float(best.get("end_time") or 0)
         start = float(best.get("unlock_start") or 0)
     except Exception:
         clear_reward_session()
         return None, None
-    now = time.time()
-    if best.get("date") != today_key() or start <= 0 or start > now or end <= 0:
+    # 允许跨天继续使用（长奖励分几天用完）；只拦截明显异常的会话
+    if start <= 0 or start > now or end <= 0:
         clear_reward_session()
         return None, None
     if end > now:
@@ -596,14 +709,21 @@ class Guardian:
         self.reward_restore_end = None
         self.reward_expired = False
         rstate, rend = load_reward_session(grace)
-        if rstate == "restore":
+        if rstate == "paused":
+            self.log.write("[reward] 奖励轮会话状态=paused 剩余=%s（锁定页点「开始使用」继续）"
+                           % self.fmt_mmss(rend))
+        elif rstate == "restore":
             self.reward_restore_end = rend
         elif rstate == "expired":
             self.reward_expired = True
-        if rstate:
+        if rstate and rstate != "paused":
             self.log.write("[reward] 奖励轮会话状态=%s end=%s" % (rstate,
                            datetime.datetime.fromtimestamp(rend).strftime("%H:%M:%S") if rend else "-"))
         self.data_ready = threading.Event()
+        self._update_state = {"version": None, "files": {}}
+        self._stop_up = threading.Event()
+        self._update_thread = threading.Thread(target=self._update_loop, daemon=True)
+        self._update_thread.start()
 
     # ---------- 数据侧 ----------
     def apply_state(self, data):
@@ -688,6 +808,27 @@ class Guardian:
                 self.dispatch_view.append((tid, str(t.get("name") or tid), m,
                                            latest_done(records_all, tid) is True, kind))
         self._grant_ai_rewards(disp)
+        # 本地媒体文件夹：MD 文档并入 AI 任务列表（复用评分/奖励体系），音视频进入播放任务
+        self.local_scan = self._scan_local_tasks()
+        seen_ids = {t["id"] for t in self.ai_tasks}
+        done_docs = {t for t, p in self._load_media_progress().items() if p.get("done")}
+        for t in (self.local_scan.get("docs") or []):
+            if t["id"] in seen_ids or t["id"] in done_docs:
+                continue                    # 已完成任务（文件归档/进度标记）不再出现
+            res = ((self.ai_doc.get("results") or {}).get(t["id"]) or {}).get(today_key()) or {}
+            try:
+                att = int(res.get("attempts") or 0)
+                best = int(res.get("best") or 0)
+            except (TypeError, ValueError):
+                att = best = 0
+            self.ai_tasks.append({"id": t["id"], "name": t["name"], "minutes": t["minutes"],
+                                  "kind": t["kind"], "threshold": t["threshold"], "attempts": att,
+                                  "max_attempts": int(self.cfg.get("ai_max_attempts") or 5),
+                                  "best": best, "pass": bool(res.get("pass")),
+                                  "poem": False, "quiz": False, "local": True,
+                                  "content": t.get("content")})
+        self.local_media = self.local_scan.get("media") or []
+        self._grant_local_rewards()
         old_wallet_ids = [w["id"] for w in self.wallet]
         self.wallet = compute_wallet(data, self.spent)
         for r in (self.ai_doc.get("rewards") or []):     # 本地 AI 奖励合入钱包
@@ -790,6 +931,8 @@ class Guardian:
     def enter_locked(self, reason):
         if self.mode == self.MODE_SHUTTING and reason == "tasks":
             return  # 正在关机流程中，不回退
+        self._parent_unlock = False
+        self._eye_abort()                 # 关闭护眼绿幕并复位
         self.mode = self.MODE_LOCKED
         self.end_time = None
         self.unlock_start = None
@@ -806,9 +949,82 @@ class Guardian:
         self.blocker.set_blocked(self._hook_on())
         self._to_lock_ui()
 
+    # ---- 护眼模式：每使用 N 分钟 → 全屏绿幕强制休息 M 秒（休息不扣使用时间） ----
+    def _eye_abort(self):
+        """销毁护眼绿幕并复位累计（锁定/家长接管/重新进入使用时调用）。"""
+        ov = getattr(self, "eye_overlay", None)
+        self.eye_overlay = None
+        self.eye_until = None
+        self.eye_base = None
+        if ov is not None:
+            try:
+                ov.destroy()
+            except Exception:
+                pass
+
+    def _eye_tick(self, now):
+        if self._parent_unlock:          # 家长临时解锁不做护眼打断
+            return
+        mins = int(self.cfg.get("eye_break_minutes") or 0)
+        secs = int(self.cfg.get("eye_break_seconds") or 0)
+        if mins <= 0 or secs <= 0:
+            return
+        if self.eye_until is not None:
+            # 休息中：使用倒计时冻结（把休息耗时不计入），绿幕显示剩余
+            if self.end_time is not None:
+                self.end_time += now - (self._eye_last or now)
+            self._eye_last = now
+            left = int(self.eye_until - now)
+            if left <= 0:
+                self._eye_end()
+            return
+        if self.eye_base is None:
+            self.eye_base = now
+        if now - self.eye_base >= mins * 60:
+            self._eye_start(secs)
+
+    def _eye_start(self, secs):
+        self.eye_until = time.time() + secs
+        self._eye_last = time.time()
+        ov = tk.Toplevel(self.root)
+        ov.configure(bg="#1a8f3a")
+        ov.geometry("%dx%d+0+0" % (ov.winfo_screenwidth(), ov.winfo_screenheight()))
+        ov.attributes("-topmost", True)
+        ov.overrideredirect(True)
+        tk.Label(ov, text="🐼 护眼休息时间", font=("Microsoft YaHei UI", 42, "bold"),
+                 bg="#1a8f3a", fg="white").pack(expand=True)
+        tip = tk.Label(ov, text="", font=("Microsoft YaHei UI", 20),
+                       bg="#1a8f3a", fg="#d9ffe3")
+        tip.pack(pady=(0, int(ov.winfo_screenheight() * 0.12)))
+        self.eye_overlay = ov
+        self.log.write("[eye] 护眼休息开始（%d 秒），使用倒计时已冻结" % secs)
+
+        def _tick():
+            if self.eye_overlay is not ov or self.eye_until is None:
+                return
+            left = max(0, int(self.eye_until - time.time()))
+            tip.configure(text="⏳ %d:%02d 后继续使用 · 看看远处，让眼睛休息一下"
+                          % (left // 60, left % 60))
+            ov.after(500, _tick)
+        _tick()
+
+    def _eye_end(self):
+        ov = getattr(self, "eye_overlay", None)
+        self.eye_overlay = None
+        self.eye_until = None
+        self.eye_base = time.time()      # 重新累计下一个 35 分钟
+        if ov is not None:
+            try:
+                ov.destroy()
+            except Exception:
+                pass
+        self.log.write("[eye] 护眼休息结束，继续计时")
+
     def enter_unlock(self, parent=False, restore_end=None, reward=None, reward_kind=False):
         """reward = (秒数, [奖励id])：奖励轮解锁，时长固定为勾选合计；
            reward_kind=True：恢复的是奖励轮倒计时（原 id 已在台账扣除，不重不发）。"""
+        self._parent_unlock = bool(parent)
+        self._eye_abort()                 # （重新）进入使用：复位护眼累计/关闭绿幕
         self.mode = self.MODE_UNLOCKED
         self.unlock_start = time.time()
         if parent:
@@ -991,14 +1207,37 @@ class Guardian:
                                      font=("Microsoft YaHei UI", self.sml, "bold"), bg="#141b2b", fg="#b9f6c8", anchor="w")
         self.lb_done_head.pack(fill="x", padx=10, pady=(8, 2))
         self.done_canvas, self.done_sb, self.done_inner = self._make_scroll_pane(left)
-        self.lb_todo_head = tk.Label(right, text="📋 待完成的任务",
+        todo_head = tk.Frame(right, bg="#141b2b")
+        todo_head.pack(fill="x", padx=10, pady=(8, 2))
+        self.lb_todo_head = tk.Label(todo_head, text="📋 待完成的任务",
                                      font=("Microsoft YaHei UI", self.sml, "bold"), bg="#141b2b", fg="#ffd166", anchor="w")
-        self.lb_todo_head.pack(fill="x", padx=10, pady=(8, 2))
+        self.lb_todo_head.pack(side="left")
+        self.todo_tab_bar = tk.Frame(todo_head, bg="#141b2b")
+        self.todo_tab_bar.pack(side="right")
         self.todo_canvas, self.todo_sb, self.todo_inner = self._make_scroll_pane(right)
+
+        # 滚轮全局分发：指针下的控件向上找所属 canvas（两个滚动栏共用，不再用 Enter/Leave 解绑）
+        wheel_canvases = [self.done_canvas, self.todo_canvas]
+        def _global_wheel(e):
+            w = getattr(e, "widget", None)
+            while w is not None:
+                if isinstance(w, tk.Canvas) and w in wheel_canvases:
+                    first, last = w.yview()
+                    if first <= 0 and last >= 1:
+                        return
+                    w.yview_scroll(-1 * int(max(1, abs(e.delta) / 120)), "units")
+                    return
+                w = getattr(w, "master", None)
+        self.root.bind_all("<MouseWheel>", _global_wheel, add="+")
 
         self.lb_net = tk.Label(self.lock_frame, text="", font=("Microsoft YaHei UI", self.sml), bg="#10141f", fg="#7f8aa3")
         self.lb_net.pack(pady=(0, 0))
         self.lb_clock = tk.Label(self.lock_frame, text="", font=("Microsoft YaHei UI", self.sml), bg="#10141f", fg="#5a6478")
+        self.btn_mic = tk.Button(self.lock_frame, text="🎤 试音", font=("Microsoft YaHei UI", 10),
+                                 bg="#1f2a3a", fg="#8fa0bd", activebackground="#2a3a50",
+                                 activeforeground="#c8d4e8", relief="flat", cursor="hand2",
+                                 padx=10, pady=2, command=self._open_mic_test)
+        self.btn_mic.pack(side="bottom", pady=(0, 6))
         self.lb_clock.pack(side="bottom", pady=6)
 
         self.btn_off = tk.Button(self.lock_frame, text="⏻  关 机", font=("Microsoft YaHei UI", max(14, int(H / 46)), "bold"),
@@ -1008,6 +1247,12 @@ class Guardian:
 
         # 解锁后的右上角倒计时悬浮窗
         self.hud = None
+        # 护眼模式状态：累计窗口起点 / 全屏绿幕 / 休息截止 / 上次心跳
+        self.eye_base = None
+        self.eye_overlay = None
+        self.eye_until = None
+        self._eye_last = None
+        self._parent_unlock = False
 
         self.root.bind("<Configure>", self._on_cfg)
         self._apply_fonts()
@@ -1025,14 +1270,8 @@ class Guardian:
         win = canvas.create_window((0, 0), window=inner, anchor="nw")
         inner.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.bind("<Configure>", lambda e: canvas.itemconfigure(win, width=e.width))
-
-        def _wheel(e):
-            first, last = canvas.yview()
-            if first <= 0 and last >= 1:
-                return
-            canvas.yview_scroll(-1 * int(max(1, abs(e.delta) / 120)), "units")
-        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _wheel))
-        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
+        # 滚轮由 build_ui 里的全局分发器处理（指针落在行控件上时 canvas 的 <Leave>
+        # 会解绑 bind_all，导致列表填满后滚轮失效——tkinter 经典坑）
         return canvas, sb, inner
 
     def _on_cfg(self, event):
@@ -1217,6 +1456,20 @@ class Guardian:
     def _update_use_btn(self):
         if not hasattr(self, "btn_use"):
             return
+        # 有未用完的奖励轮会话 → 优先显示「继续上次使用」（已支付的时间不被必做门禁挡住）
+        try:
+            rstate, rend = load_reward_session()
+        except Exception:
+            rstate, rend = None, None
+        resume_min = 0
+        if rstate == "paused" and rend and rend > 60:
+            resume_min = int(rend // 60)           # rend = 剩余秒数（暂停语义）
+        elif rstate == "restore" and rend and rend - time.time() > 60:
+            resume_min = int((rend - time.time()) // 60)
+        if resume_min > 0:
+            self.btn_use.configure(text="▶ 继续上次使用（剩余 %d 分钟）" % resume_min, state="normal")
+            self.lb_use.configure(text="上次未用完的时间还在，点击继续（不会重复扣除）")
+            return
         cap = int(self.cfg.get("reward_max_minutes") or 480)
         tip = "完成必做任务后，勾选已完成的任务开始使用电脑，支持多选，时间会自动累积"
         total = sum(w["minutes"] for w in self.wallet
@@ -1235,6 +1488,22 @@ class Guardian:
             self.lb_use.configure(text=tip)
 
     def start_reward_use(self):
+        # 优先恢复上次暂停/中断的奖励轮（剩余时间已在台账扣除，不重复扣）
+        try:
+            rstate, rend = load_reward_session()
+        except Exception:
+            rstate, rend = None, None
+        if rstate == "paused" and rend and rend > 60:
+            # 暂停语义：rend 是「剩余秒数」，从当前时间重新起算（暂停期间不计时）
+            self.log.write("[reward] 继续上次未用完的时间（剩余 %s）" % self.fmt_mmss(rend))
+            clear_reward_session()
+            self.enter_unlock(restore_end=time.time() + rend, reward_kind=True)
+            return
+        if rstate == "restore" and rend and rend - time.time() > 60:
+            self.log.write("[reward] 继续上次未用完的时间（剩余 %s）"
+                           % self.fmt_mmss(rend - time.time()))
+            self.enter_unlock(restore_end=rend, reward_kind=True)
+            return
         if not getattr(self, "all_done", False):
             self.log.write("[reward] 拒绝使用：今日必做任务未完成")
             return
@@ -1259,6 +1528,745 @@ class Guardian:
         self.enter_unlock(parent=False, reward=(total * 60, sorted(used)))
 
     # ---- AI 评分任务（PCVoiceScore 联动） ----
+    def _pause_reward_use(self):
+        """⏸ 暂停奖励轮：剩余时间保留在会话文件里并锁定屏幕；
+        之后点「开始使用」从剩余继续（支持重启、跨天），不重复扣台账。
+        同时收起媒体面板（媒体暂停、进度保留）——否则面板盖住锁定页无法操作。"""
+        if self.mode != self.MODE_UNLOCKED or self.reward_ids is None or self.end_time is None:
+            return
+        remaining = max(60, int(self.end_time - time.time()))
+        self._close_media_panel()
+        save_reward_session(self.end_time, self.unlock_start, remaining=remaining)
+        self.log.write("[reward] 暂停：剩余 %s 已保留（暂停期间不计时），锁定页点「开始使用」继续"
+                       % self.fmt_mmss(remaining))
+        self.enter_locked(reason="pause")
+
+    def _end_reward_use(self):
+        """⏹ 提前结束奖励轮：剩余时间（整分钟）退回钱包并锁定；媒体面板同步收起。"""
+        if self.mode != self.MODE_UNLOCKED or self.reward_ids is None or self.end_time is None:
+            return
+        rem_s = int(max(0, self.end_time - time.time()))
+        rem_min = -(-rem_s // 60)            # 向上取整：剩 8:59 也退 9 分钟，一分不丢
+        self._close_media_panel()
+        clear_reward_session()
+        if rem_min > 0:
+            rid = "resume-%d" % int(time.time())
+            self.ai_doc.setdefault("rewards", []).append({
+                "id": "ai-%s" % rid, "task": rid, "name": "⏸ 上次剩余时间",
+                "minutes": rem_min, "grantedAt": time.time()})
+            save_ai_score(self.ai_doc)
+        self.log.write("[reward] 提前结束：剩余 %d 分钟退回钱包" % rem_min)
+        self.enter_locked(reason="pause")
+
+    def _media_duration_ms(self, path, kind):
+        """媒体总时长（毫秒）：视频用 cv2；音频先试 wave 头再用 ffmpeg 信息行。失败返回 0。"""
+        if kind == "watch":
+            return _video_duration_ms(path)
+        try:
+            import wave as _w
+            with _w.open(path, "rb") as w:
+                return int(w.getnframes() / w.getframerate() * 1000)
+        except Exception:
+            pass
+        try:
+            import imageio_ffmpeg
+            ff = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            return 0
+        try:
+            r = subprocess.run([ff, "-i", path], capture_output=True, timeout=60)
+            m = re.search(r"Duration:\s*(\d+):(\d+):(\d+)\.(\d+)",
+                          r.stderr.decode("utf-8", "ignore"))
+            if m:
+                h, mi, s, ms = m.groups()
+                return ((int(h) * 60 + int(mi)) * 60 + int(s)) * 1000 + int(ms) * 10
+        except Exception:
+            pass
+        return 0
+
+    def _grant_local_rewards(self):
+        """本地任务完成 → 奖励入钱包（每任务只发一次）：MD 文档评分通过 / 音视频播放完成。
+        完成后源文件自动归档到 media\\已完成\\（不再作为任务出现）；归档失败则用进度标记隐藏。"""
+        granted = {r.get("task") for r in (self.ai_doc.get("rewards") or [])}
+        prog = self._load_media_progress()
+        pend = []
+        for t in (getattr(self, "local_scan", {}).get("docs") or []):
+            res = ((self.ai_doc.get("results") or {}).get(t["id"]) or {}).get(today_key()) or {}
+            if res.get("pass") and t["id"] not in granted:
+                pend.append(("🎤 " + t["name"], t["id"], t["minutes"], t.get("path")))
+        for mt in (getattr(self, "local_scan", {}).get("media") or []):
+            if prog.get(mt["id"], {}).get("done") and mt["id"] not in granted:
+                pend.append((("🎧 " if mt["kind"] == "listen" else "📺 ") + mt["name"],
+                             mt["id"], mt["minutes"], mt.get("path")))
+        changed = False
+        for name, tid, m, path in pend:
+            if m <= 0:
+                continue
+            self.ai_doc.setdefault("rewards", []).append({
+                "id": "ai-%s-%d" % (tid, int(time.time())), "task": tid,
+                "name": name, "minutes": m, "grantedAt": time.time()})
+            changed = True
+            prog[tid] = {"done": True, "name": name, "archived": bool(path)}
+            self._save_media_progress(prog)
+            if path:
+                self._archive_completed_file(path)
+            self.log.write("[media] 「%s」完成，发放奖励 %d 分钟入钱包" % (name, m))
+        if changed:
+            save_ai_score(self.ai_doc)
+
+    def _archive_completed_file(self, path):
+        """完成的本地任务文件移入 media\\已完成\\（保持相对路径，重名加时间戳）；
+        失败（文件被占用等）返回 False——进度标记仍会隐藏该任务。"""
+        try:
+            mdir = self._media_dir()
+            rel = os.path.relpath(path, mdir)
+            dest = os.path.join(mdir, "已完成", rel)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            if os.path.exists(dest):
+                base, ext = os.path.splitext(dest)
+                dest = "%s_%d%s" % (base, int(time.time()), ext)
+            os.rename(path, dest)
+            self.log.write("[media] 已完成任务文件归档：%s" % dest)
+            return True
+        except Exception as e:
+            self.log.write("[media] 归档失败（进度标记仍会隐藏任务）%r" % e)
+            return False
+
+    def _media_dir(self):
+        return str(self.cfg.get("media_dir") or r"C:\PCGuardian\media")
+
+    def _scan_local_tasks(self):
+        """扫描本地媒体文件夹——按类型分文件夹存放（递归，子文件夹 = 合集）：
+           media\\阅读\\  .md 朗读材料（AI 评分）
+           media\\单词\\  .md 单词表（AI 评分）
+           media\\视频\\  MP4/AVI/MKV/MOV/WEBM/WMV
+           media\\音频\\  MP3/WAV/M4A/AAC/FLAC/OGG/WMA
+           media\\已完成\\ 归档（不扫描）
+        类型文件夹内类型以文件夹为准（阅读夹里的文件一律按朗读处理）；
+        根目录散落文件 / 未知子文件夹按扩展名归类（兼容旧结构）。"""
+        out = {"docs": [], "media": []}
+        KMIN = {"read": 15, "words": 10, "watch": 15, "listen": 10}
+
+        def add_doc(p, kind, coll):
+            if os.path.basename(p).lower() == "readme.md":
+                return
+            t = parse_local_md(p)
+            if not t:
+                return
+            t["kind"] = kind                    # 文件夹决定类型
+            t["id"] = _local_id("md_", p)
+            t["threshold"] = 80
+            t["local"] = True
+            t["path"] = p
+            if kind == "read":
+                # 阅读按字数计奖励：每 250 字 = 10 分钟（比例统计，不足 250 字按 10 分钟起）
+                content = t.get("content") or ""
+                if isinstance(content, list):
+                    content = "\n".join(str(x) for x in content)
+                chars = len(re.sub(r"\s", "", content))
+                t["chars"] = chars
+                t["minutes"] = max(10, int(round(chars / 250.0 * 10)))
+            elif kind == "words":
+                # 单词按行数计奖励：每行 = 0.5 分钟，多行汇总为任务总时长
+                content = t.get("content")
+                lines = len(content) if isinstance(content, list) else \
+                    len([l for l in str(content).splitlines() if l.strip()])
+                t["chars"] = lines                     # 行数（展示用）
+                t["minutes"] = max(1, int(round(lines * 0.5)))
+            else:
+                t["minutes"] = KMIN[kind]
+            if coll and not t["name"].startswith(coll):
+                t["name"] = ("%s·%s" % (coll, t["name"]))[:30]
+            out["docs"].append(t)
+
+        def add_media(p, kind, coll):
+            mid = _local_id("med_", p)
+            dur = dur_cache.get(mid)
+            if dur is None:                  # 时长探测较慢（cv2/ffmpeg）：按文件缓存
+                dur = self._media_duration_ms(p, kind)
+                dur_cache[mid] = dur
+                changed_cache[0] = True
+            # 奖励 = 播放总时长 ÷ 2（向上取整到分钟，保底 1 分钟）；解析失败回退固定值
+            if dur > 0:
+                minutes = max(1, int(dur / 120000.0 + 0.5))
+            else:
+                minutes = KMIN[kind]
+            out["media"].append({"id": mid, "kind": kind,
+                                 "name": os.path.splitext(os.path.basename(p))[0][:30],
+                                 "path": p, "collection": coll, "duration_ms": dur,
+                                 "minutes": minutes, "local": True})
+
+        def scan_tree(base, kind=None, coll_name=""):
+            """递归扫一个文件夹；kind 给定时以文件夹类型为准，否则按扩展名归类。
+            coll_name：根目录未知子文件夹作为合集时的合集名。"""
+            for root, dirs, files in os.walk(base):
+                dirs[:] = [d for d in dirs if d != "已完成"]   # 归档文件夹不再扫描
+                rel = os.path.relpath(root, base)
+                coll = coll_name if rel == "." else os.path.basename(rel)
+                for fn in sorted(files):
+                    p = os.path.join(root, fn)
+                    if not os.path.isfile(p) or fn.lower() == "readme.md":
+                        continue
+                    ext = os.path.splitext(fn)[1].lower()
+                    if ext == ".md":
+                        if kind:                        # 类型文件夹：文件夹决定类型
+                            add_doc(p, kind, coll)
+                        else:                           # 兼容模式：按内容判定朗读/单词
+                            t0 = parse_local_md(p)
+                            if t0:
+                                add_doc(p, t0["kind"], coll)
+                    elif kind == "listen" and ext in AUDIO_EXT:
+                        add_media(p, "listen", coll)
+                    elif kind == "watch" and ext in VIDEO_EXT:
+                        add_media(p, "watch", coll)
+                    elif kind is None and ext in AUDIO_EXT:
+                        add_media(p, "listen", coll)
+                    elif kind is None and ext in VIDEO_EXT:
+                        add_media(p, "watch", coll)
+
+        try:
+            mdir = self._media_dir()
+            # 时长缓存：媒体文件探测较慢，扫描每轮都跑，按文件 ID 缓存（.cache/durations.json）
+            dur_cache, changed_cache = {}, [False]
+            try:
+                dc_path = os.path.join(mdir, ".cache", "durations.json")
+                if os.path.exists(dc_path):
+                    dur_cache = json.load(open(dc_path, encoding="utf-8"))
+            except Exception:
+                dur_cache = {}
+            if os.path.isdir(mdir):
+                # 分类型文件夹：类型以文件夹为准
+                for kind, dname in (("read", "阅读"), ("words", "单词"),
+                                    ("watch", "视频"), ("listen", "音频")):
+                    base = os.path.join(mdir, dname)
+                    if os.path.isdir(base):
+                        scan_tree(base, kind)
+                # 根目录散落文件与未知子文件夹：按扩展名归类（兼容旧结构）
+                for fn in sorted(os.listdir(mdir)):
+                    p = os.path.join(mdir, fn)
+                    if os.path.isdir(p) and fn not in ("阅读", "单词", "视频", "音频", "已完成"):
+                        scan_tree(p, None, fn)      # 未知子文件夹：按扩展名归类，文件夹名=合集
+                    elif os.path.isfile(p):
+                        ext = os.path.splitext(fn)[1].lower()
+                        if ext == ".md":
+                            t = parse_local_md(p)
+                            if t:
+                                add_doc(p, t["kind"], "")
+                        elif ext in AUDIO_EXT:
+                            add_media(p, "listen", "")
+                        elif ext in VIDEO_EXT:
+                            add_media(p, "watch", "")
+                try:
+                    if changed_cache[0]:
+                        os.makedirs(os.path.dirname(dc_path), exist_ok=True)
+                        json.dump(dur_cache, open(dc_path, "w", encoding="utf-8"),
+                                  ensure_ascii=False, indent=1)
+                except Exception:
+                    pass
+        except Exception as e:
+            try:
+                self.log.write("[media] 扫描失败 %r" % e)
+            except Exception:
+                pass
+        return out
+
+    def _media_prog_path(self):
+        return _audio_cfg_path().replace("audio.json", "media.progress.json")
+
+    def _load_media_progress(self):
+        try:
+            with open(self._media_prog_path(), encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _save_media_progress(self, d):
+        try:
+            p = self._media_prog_path()
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(d, f, ensure_ascii=False)
+        except Exception:
+            pass
+
+    def _safe_open_media(self, mt):
+        """播放入口的异常保护：面板构建中途出错时降级到系统播放器面板，绝不留无法操作的死黑屏。"""
+        try:
+            self.open_media_player(mt)
+        except Exception:
+            import traceback
+            self.log.write("[media] 播放面板异常，降级系统播放器 "
+                           + traceback.format_exc()[-400:])
+            self._close_media_panel()
+            self._system_player_task(mt)
+
+    def _next_episode(self, mt):
+        """合集连播：返回同合集内下一集（未完成、按文件名排序），没有返回 None。"""
+        if not mt.get("collection"):
+            return None
+        prog = self._load_media_progress()
+        eps = sorted([m for m in getattr(self, "local_media", [])
+                      if m.get("collection") == mt["collection"]
+                      and not prog.get(m["id"], {}).get("done")], key=lambda x: x["name"])
+        return eps[0] if eps else None
+
+    def _extract_audio_mp3(self, path):
+        """抽取视频音轨为 mp3（cv2 播放器的 MCI 音轨用）；无音轨/失败返回 None。"""
+        try:
+            import imageio_ffmpeg
+            ff = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            return None
+        cache = os.path.join(os.path.dirname(path), ".cache")
+        try:
+            os.makedirs(cache, exist_ok=True)
+        except Exception:
+            return None
+        out = os.path.join(cache, _local_id("a_", path) + ".mp3")
+        if os.path.exists(out) and os.path.getsize(out) > 0:
+            return out
+        try:
+            r = subprocess.run([ff, "-y", "-i", path, "-vn", "-c:a", "mp3", "-b:a", "128k", out],
+                               capture_output=True, timeout=1800)
+            if r.returncode == 0 and os.path.exists(out) and os.path.getsize(out) > 0:
+                return out
+        except Exception:
+            pass
+        return None
+
+    def _open_cv_player(self, mt):
+        """cv2 逐帧内嵌播放（MCI 解不了的格式，如 H.264 MP4）：
+        视频帧渲染到面板内黑色 Label；音轨抽成 mp3 由 MCI 单独播放（无音轨则静音播放）。
+        完成/发奖/合集连播与 MCI 面板一致。失败返回 False（调用方走系统播放器兜底）。"""
+        try:
+            import cv2
+            from PIL import Image, ImageTk
+        except Exception as e:
+            self.log.write("[media] cv2/PIL 不可用 %r" % e)
+            return False
+        cap = cv2.VideoCapture(mt["path"])
+        if not cap.isOpened():
+            return False
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+        frame_ms = 1000.0 / fps
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        dur_ms = int(total_frames * frame_ms)
+        audio_alias = None
+        amp3 = self._extract_audio_mp3(mt["path"])
+        if amp3:
+            a = "aud_" + re.sub(r"\W", "", mt["id"])
+            if self._mci('open "%s" type mpegvideo alias %s' % (amp3, a), quiet=True) == 0:
+                audio_alias = a
+        prog_all = self._load_media_progress()
+        prog = prog_all.get(mt["id"], {})
+        panel = tk.Frame(self.lock_frame, bg="#10141f")
+        panel.place(x=0, y=0, relwidth=1, relheight=1)
+        self.media_panel = panel
+        panel.update_idletasks()
+        H = max(400, panel.winfo_height() or panel.winfo_screenheight())
+        W = max(600, panel.winfo_width() or panel.winfo_screenwidth())
+        kind_name = "📺 视频" if mt["kind"] == "watch" else "🎧 音频"
+        tk.Label(panel, text="%s %s · %d 分钟奖励 · 完成后自动计入%s" % (
+            kind_name, mt["name"], mt["minutes"],
+            "" if audio_alias else "（此文件无音轨，静音播放）"),
+            font=("Microsoft YaHei UI", 12, "bold"), bg="#10141f", fg="#ffe08a").pack(pady=(H // 40, 4))
+        video_label = tk.Label(panel, bg="#000000")
+        video_label.pack(fill="both", expand=True, padx=int(W * 0.06))
+        meter = tk.Label(panel, text="", font=("Consolas", 12), bg="#10141f", fg="#7ee08a")
+        meter.pack(pady=4)
+        st = {"pos": min(int(prog.get("pos") or 0), max(0, dur_ms - 800)),
+              "playing": True, "closed": False}
+        self._media_state = {"alias": audio_alias or ("cv_" + mt["id"]),
+                             "mt": mt, "length": dur_ms, "prog": prog}
+        if audio_alias:
+            self._mci("play %s from %d" % (audio_alias, st["pos"]))
+        cap.set(cv2.CAP_PROP_POS_MSEC, st["pos"])
+        img_ref = {"img": None}
+
+        def show_frame():
+            ok, frame = cap.read()
+            if not ok:
+                return False
+            img = ImageTk.PhotoImage(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+            video_label.configure(image=img)
+            img_ref["img"] = img                # 防 PhotoImage 被回收
+            return True
+
+        def _toggle():
+            if st["closed"]:
+                return
+            if st["playing"]:
+                if audio_alias:
+                    self._mci("pause %s" % audio_alias, quiet=True)
+                st["playing"] = False
+                btn_pause.configure(text="▶ 继续")
+            else:
+                if audio_alias:
+                    self._mci("play %s from %d" % (audio_alias, st["pos"]), quiet=True)
+                st["playing"] = True
+                btn_pause.configure(text="⏸ 暂停")
+                panel.after(30, tick)
+
+        def _close():
+            st["closed"] = True
+            if audio_alias:
+                self._mci("pause %s" % audio_alias, quiet=True)
+            cap.release()
+            prog_all = self._load_media_progress()
+            prog_all[mt["id"]] = {"done": False, "pos": int(st["pos"]), "name": mt["name"]}
+            self._save_media_progress(prog_all)
+            self._media_state = None
+            p = getattr(self, "media_panel", None)
+            self.media_panel = None
+            try:
+                p.destroy()
+            except Exception:
+                pass
+
+        def tick():
+            if st["closed"] or self._media_state is None:
+                return
+            if not st["playing"]:
+                return
+            if audio_alias:
+                b2 = ctypes.create_unicode_buffer(64)
+                ctypes.windll.winmm.mciSendStringW("status %s position" % audio_alias, b2, 64, 0)
+                try:
+                    st["pos"] = int(b2.value or 0)
+                except ValueError:
+                    pass
+            else:
+                st["pos"] += int(frame_ms)
+            want = int(st["pos"] * fps / 1000.0)
+            if abs(cap.get(cv2.CAP_PROP_POS_FRAMES) - want) > 2:
+                cap.set(cv2.CAP_PROP_POS_FRAMES, want)
+            if not show_frame():
+                st["pos"] = dur_ms
+            meter.configure(text="%d:%02d / %d:%02d（%d%%）" % (
+                st["pos"] // 60000, st["pos"] // 1000 % 60,
+                dur_ms // 60000, dur_ms // 1000 % 60, st["pos"] * 100 // max(1, dur_ms)))
+            if st["pos"] >= dur_ms - 500:
+                prog_all = self._load_media_progress()
+                prog_all[mt["id"]] = {"done": True, "pos": dur_ms, "name": mt["name"]}
+                self._save_media_progress(prog_all)
+                if audio_alias:
+                    self._mci("close %s" % audio_alias, quiet=True)
+                cap.release()
+                self._media_state = None
+                p = getattr(self, "media_panel", None)
+                self.media_panel = None
+                try:
+                    p.destroy()
+                except Exception:
+                    pass
+                self.local_media = [m for m in getattr(self, "local_media", []) if m["id"] != mt["id"]]
+                self._grant_local_rewards()
+                self._todo_sig = None
+                self.render()
+                nxt = self._next_episode(mt)
+                if nxt:
+                    self.open_media_player(nxt)   # 合集连播
+                return
+            panel.after(33, tick)
+
+        btn_pause = tk.Button(panel, text="⏸ 暂停", font=("Microsoft YaHei UI", 12, "bold"),
+                              bg="#4a3a78", fg="white", activebackground="#3d3063",
+                              relief="flat", cursor="hand2", padx=22, pady=5, command=_toggle)
+        btn_pause.pack(pady=8)
+        tk.Button(panel, text="⏹ 关闭（记住进度，下次续播）", font=("Microsoft YaHei UI", 11),
+                  bg="#2a2a3a", fg="#8fa0bd", activebackground="#3a3a4a", relief="flat",
+                  cursor="hand2", padx=14, pady=4, command=_close).pack(pady=4)
+        tick()
+        return True
+
+    def _transcode_to_mpg(self, path):
+        """MP4/H.264 等 MCI 不支持的格式 → ffmpeg 转码为 MPEG-1（MCI mpegvideo 原生可播）。
+        缓存在 media/.cache/（同文件只转一次）；无 ffmpeg 或转码失败返回 None。"""
+        try:
+            import imageio_ffmpeg
+            ff = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            self.log.write("[media] 未找到 ffmpeg（pip install imageio-ffmpeg），无法转码")
+            return None
+        cache = os.path.join(os.path.dirname(path), ".cache")
+        try:
+            os.makedirs(cache, exist_ok=True)
+        except Exception:
+            return None
+        out = os.path.join(cache, _local_id("t_", path) + ".mpg")
+        if os.path.exists(out) and os.path.getsize(out) > 0:
+            return out
+        try:
+            r = subprocess.run([ff, "-y", "-i", path,
+                                "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                                "-c:v", "mpeg1video", "-b:v", "1152k",
+                                "-c:a", "mp2", "-b:a", "128k", out],
+                               capture_output=True, timeout=1800)
+            if r.returncode == 0 and os.path.getsize(out) > 0:
+                self.log.write("[media] 已转码为 MCI 可播格式：%s" % out)
+                return out
+            self.log.write("[media] 转码失败 rc=%d %s" % (
+                r.returncode, r.stderr[-200:].decode("utf-8", "ignore")))
+        except Exception as e:
+            self.log.write("[media] 转码异常 %r" % e)
+        return None
+
+    def _system_player_task(self, mt):
+        """MCI 不支持的格式（H.264 MP4 等）：临时隐藏锁屏 → 系统播放器全屏播放；
+        屏幕顶部保留**置顶迷你条**（我看完了 / 重新打开 / 返回）。
+        **防跳看**：累计观看时长（跨重新打开累加）不足 视频时长−1分钟 → 点「我看完了」不发奖，
+        提示还差多久；观看期间锁屏隐藏（系统播放器是独立窗口，会被全屏锁屏压住）。"""
+        kind_name = "📺 视频" if mt["kind"] == "watch" else "🎧 音频"
+        self._close_media_panel()
+        dur_ms = _video_duration_ms(mt["path"])
+        prog0 = self._load_media_progress().get(mt["id"], {})
+        watched = {"s": float(prog0.get("watched") or 0.0)}
+        opened_at = {"t": None}
+        need_hint = ("需观看约 %d 分钟" % round((dur_ms / 1000.0) / 60)) if dur_ms else "需观看约 20 分钟"
+
+        def _done():
+            now = time.time()
+            if opened_at["t"]:
+                watched["s"] += now - opened_at["t"]
+            opened_at["t"] = None
+            ok, remain = _watch_enough(dur_ms, watched["s"])
+            if not ok:
+                lbl.configure(text="⏳ 观看时长不足（还差约 %.0f 分钟）——%s，请继续观看"
+                              % (remain, need_hint), fg="#e67e22")
+                _save_watched()
+                return
+            prog = self._load_media_progress()
+            prog[mt["id"]] = {"done": True, "pos": 0, "name": mt["name"],
+                              "self": True, "watched": int(watched["s"])}
+            self._save_media_progress(prog)
+            self.local_media = [m for m in getattr(self, "local_media", []) if m["id"] != mt["id"]]
+            self._grant_local_rewards()
+            self._todo_sig = None
+            try:
+                bar.destroy()
+            except Exception:
+                pass
+            self.root.deiconify()              # 恢复锁屏
+            self.render()
+
+        def _save_watched():
+            prog = self._load_media_progress()
+            p = prog.get(mt["id"], {})
+            p["watched"] = int(watched["s"])
+            p.setdefault("done", False)
+            prog[mt["id"]] = p
+            self._save_media_progress(prog)
+
+        def _back():
+            if opened_at["t"]:
+                watched["s"] += time.time() - opened_at["t"]
+                opened_at["t"] = None
+                _save_watched()
+            try:
+                bar.destroy()
+            except Exception:
+                pass
+            self.root.deiconify()              # 返回锁定页（不计完成，观看时长已累计）
+            self.render()
+
+        def _open_player():
+            self.root.withdraw()               # 播放期间隐藏锁屏，让系统播放器可见
+            opened_at["t"] = time.time()
+            try:
+                os.startfile(mt["path"])
+            except Exception as e:
+                self.log.write("[media] startfile 失败 %r" % e)
+                if opened_at["t"]:
+                    watched["s"] += time.time() - opened_at["t"]
+                _back()
+
+        bar = tk.Toplevel(self.root)
+        bar.title("正在观看：" + mt["name"])
+        bar.configure(bg="#10141f")
+        bar.geometry("620x170+%d+40" % max(0, (bar.winfo_screenwidth() - 620) // 2))
+        bar.attributes("-topmost", True)
+        bar.protocol("WM_DELETE_WINDOW", _back)
+        tk.Label(bar, text="%s 正在观看：%s" % (kind_name, mt["name"]),
+                 font=("Microsoft YaHei UI", 12, "bold"), bg="#10141f", fg="#ffe08a").pack(pady=(12, 2))
+        lbl = tk.Label(bar, text="已累计观看 %d 分钟 · %s（不足时长无法领取奖励）"
+                       % (watched["s"] / 60, need_hint),
+                       font=("Microsoft YaHei UI", 10), bg="#10141f", fg="#7ee08a")
+        lbl.pack(pady=2)
+        brow = tk.Frame(bar, bg="#10141f")
+        brow.pack(pady=6)
+        tk.Button(brow, text="▶ 打开/重新打开", font=("Microsoft YaHei UI", 11, "bold"),
+                  bg="#1f5c8b", fg="white", activebackground="#174a70", relief="flat",
+                  cursor="hand2", padx=12, pady=5, command=_open_player).pack(side="left", padx=5)
+        tk.Button(brow, text="✅ 我看完了", font=("Microsoft YaHei UI", 11, "bold"),
+                  bg="#2e7d32", fg="white", activebackground="#256a29", relief="flat",
+                  cursor="hand2", padx=12, pady=5, command=_done).pack(side="left", padx=5)
+        tk.Button(brow, text="◀ 返回", font=("Microsoft YaHei UI", 11),
+                  bg="#2a2a3a", fg="#8fa0bd", activebackground="#3a3a4a", relief="flat",
+                  cursor="hand2", padx=12, pady=5, command=_back).pack(side="left", padx=5)
+        tk.Label(bar, text="防跳看：观看时长不足视频长度时，「我看完了」不会发放奖励",
+                 font=("Microsoft YaHei UI", 9), bg="#10141f", fg="#5a6478").pack(pady=(4, 10))
+        _open_player()
+
+    def _close_media_panel(self, mark_done=False):
+        """收起内嵌媒体面板：暂停 MCI、记住进度；mark_done=True 记为完成并发奖。"""
+        st = getattr(self, "_media_state", None)
+        self._media_state = None
+        p = getattr(self, "media_panel", None)
+        self.media_panel = None
+        if p is not None:
+            try:
+                p.destroy()
+            except Exception:
+                pass
+        if not st:
+            return
+        alias, mt, length = st["alias"], st["mt"], st["length"]
+        b2 = ctypes.create_unicode_buffer(64)
+        ctypes.windll.winmm.mciSendStringW("status %s position" % alias, b2, 64, 0)
+        try:
+            pos = int(b2.value or 0)
+        except ValueError:
+            pos = 0
+        done = bool(mark_done or (length and pos >= length - 1500))
+        prog_all = self._load_media_progress()
+        prog_all[mt["id"]] = {"done": done or bool(st["prog"].get("done")),
+                              "pos": length - 1000 if done else pos, "name": mt["name"]}
+        self._save_media_progress(prog_all)
+        self._mci("close %s" % alias, quiet=True)
+        if done and not st["prog"].get("done"):
+            self.local_media = [m for m in getattr(self, "local_media", []) if m["id"] != mt["id"]]
+            self._grant_local_rewards()
+            self._todo_sig = None
+            self.render()
+
+    def _mci(self, cmd, quiet=False):
+        r = ctypes.windll.winmm.mciSendStringW(cmd, None, 0, 0)
+        if r and not quiet:
+            buf = ctypes.create_unicode_buffer(256)
+            ctypes.windll.winmm.mciGetErrorStringW(r, buf, 256)
+            self.log.write("[media] MCI %s → %s" % (cmd[:60], buf.value))
+        return r
+
+    def open_media_player(self, mt):
+        """🎧/📺 本地媒体播放：锁屏页内嵌面板；视频以**子窗口**嵌入面板（不会被锁屏压住）；
+        MCI 播放、断点续播、播放完成自动通过并发放奖励（合集自动接下一集）。"""
+        if getattr(self, "_media_state", None):
+            self._close_media_panel()          # 已有播放面板：先收起再开新的
+        prog_all = self._load_media_progress()
+        prog = prog_all.get(mt["id"], {})
+        alias = "pcg_" + re.sub(r"\W", "", mt["id"])
+        path = mt["path"]
+        is_video = mt["kind"] == "watch"
+        # 先建内嵌面板：视频区域要作为 MCI 的父窗口（style child），必须先于 open 存在
+        panel = tk.Frame(self.lock_frame, bg="#10141f")
+        panel.place(x=0, y=0, relwidth=1, relheight=1)
+        self.media_panel = panel
+        panel.update_idletasks()
+        H = max(400, panel.winfo_height() or panel.winfo_screenheight())
+        W = max(600, panel.winfo_width() or panel.winfo_screenwidth())
+        kind_name = "📺 视频" if is_video else "🎧 音频"
+        tk.Label(panel, text="%s %s · %d 分钟奖励 · 完成后自动计入" % (kind_name, mt["name"], mt["minutes"]),
+                 font=("Microsoft YaHei UI", 13, "bold"), bg="#10141f", fg="#ffe08a").pack(pady=(H // 40, 6))
+        meter = tk.Label(panel, text="", font=("Consolas", 13), bg="#10141f", fg="#7ee08a")
+        meter.pack(pady=8)
+        video_area = None
+        if is_video:
+            video_area = tk.Frame(panel, bg="#000000", height=int(H * 0.58))
+            video_area.pack(fill="x", padx=int(W * 0.05))
+            video_area.update_idletasks()
+        state = {"paused": False}
+        # 打开媒体：视频优先作为面板子窗口（style child，z 序跟随面板不会被压住）；失败逐级降级
+        attempts = []
+        if is_video:
+            hwnd = video_area.winfo_id()
+            attempts += ['open "%s" alias %s parent %d style child' % (path, alias, hwnd),
+                         'open "%s" type mpegvideo alias %s parent %d style child' % (path, alias, hwnd)]
+        attempts += ['open "%s" alias %s' % (path, alias),
+                     'open "%s" type mpegvideo alias %s' % (path, alias),
+                     'open "%s" type waveaudio alias %s' % (path, alias)]
+        opened = False
+        for cmd in attempts:
+            if self._mci(cmd) == 0:              # 失败也记日志（排查"音频打不开"）
+                opened = True
+                state["child"] = "parent" in cmd
+                break
+        if not opened and is_video:
+            # MCI 无该格式解码器（H.264 MP4 常见）→ ffmpeg 转码为 MPEG-1（MCI 原生可播），缓存复用
+            mpg = self._transcode_to_mpg(path)
+            if mpg:
+                for cmd in ('open "%s" alias %s' % (mpg, alias),
+                            'open "%s" type mpegvideo alias %s' % (mpg, alias)):
+                    if self._mci(cmd) == 0:
+                        opened = True
+                        break
+        if not opened:
+            self.media_panel = None
+            panel.destroy()
+            if is_video and self._open_cv_player(mt):
+                return                       # cv2 逐帧内嵌播放（H.264 MP4 等都支持）
+            self._system_player_task(mt)     # cv2 不可用/失败 → 系统播放器 + 自报完成
+            return
+        self._media_state = {"alias": alias, "mt": mt, "length": 0, "prog": prog}
+        buf = ctypes.create_unicode_buffer(64)
+        ctypes.windll.winmm.mciSendStringW("status %s length" % alias, buf, 64, 0)
+        try:
+            length = int(buf.value or 0)
+        except ValueError:
+            length = 0
+        self._media_state["length"] = length
+        pos0 = min(int(prog.get("pos") or 0), max(0, length - 1500)) if length else 0
+        if is_video and state.get("child"):
+            self._mci("put %s client at 0 0 %d %d" % (alias, video_area.winfo_width(),
+                                                      video_area.winfo_height()), quiet=True)
+
+        def _toggle():
+            if self._media_state is None:
+                return
+            if state["paused"]:
+                self._mci("resume %s" % alias, quiet=True) or self._mci("play %s" % alias, quiet=True)
+                state["paused"] = False
+                btn_pause.configure(text="⏸ 暂停")
+            else:
+                self._mci("pause %s" % alias, quiet=True)
+                state["paused"] = True
+                btn_pause.configure(text="▶ 继续")
+
+        btn_pause = tk.Button(panel, text="⏸ 暂停", font=("Microsoft YaHei UI", 12, "bold"),
+                              bg="#4a3a78", fg="white", activebackground="#3d3063",
+                              relief="flat", cursor="hand2", padx=22, pady=5, command=_toggle)
+        btn_pause.pack(pady=10)
+        tk.Button(panel, text="⏹ 关闭（记住进度，下次续播）", font=("Microsoft YaHei UI", 11),
+                  bg="#2a2a3a", fg="#8fa0bd", activebackground="#3a3a4a", relief="flat",
+                  cursor="hand2", padx=14, pady=4,
+                  command=lambda: self._close_media_panel(False)).pack(pady=4)
+
+        self._mci("play %s from %d" % (alias, pos0))
+
+        def poll():
+            if getattr(self, "_media_state", {}).get("alias") != alias:
+                return                          # 面板已被关闭/替换：停止轮询
+            if state["paused"]:
+                panel.after(500, poll)
+                return
+            b2 = ctypes.create_unicode_buffer(64)
+            ctypes.windll.winmm.mciSendStringW("status %s position" % alias, b2, 64, 0)
+            try:
+                pos = int(b2.value or 0)
+            except ValueError:
+                pos = 0
+            if length:
+                meter.configure(text="%d:%02d / %d:%02d（%d%%）" % (
+                    pos // 60000, pos // 1000 % 60, length // 60000, length // 1000 % 60,
+                    pos * 100 // length))
+                if pos >= length - 1200:
+                    nxt = self._next_episode(mt)
+                    self._close_media_panel(mark_done=True)
+                    if nxt:
+                        self.open_media_player(nxt)   # 合集：本集完成自动接下一集
+                    return
+            panel.after(500, poll)
+        poll()
+
     def _grant_ai_rewards(self, disp):
         """评分通过且未发放过的 AI 任务 → 奖励分钟入本机钱包台账（每任务只发一次）。"""
         granted = {r.get("task") for r in (self.ai_doc.get("rewards") or [])}
@@ -1360,7 +2368,190 @@ class Guardian:
         if getattr(self, "scorer_active", False):
             self.log.write("[ai] 评分已在进行中")
             return
+        self._close_media_panel()     # 先收起媒体面板（暂停并记住进度）
         self._run_scoring(tid)
+
+    # ---- 自动升级（GitHub 新版本检测/下载/安装） ----
+    def _update_urls(self, name):
+        """返回 name 文件的候选下载地址（测试可覆盖 update_base；生产 raw 优先 jsdelivr 兜底）。"""
+        base = str(self.cfg.get("update_base") or "").rstrip("/")
+        if base:
+            return [base + "/" + name]
+        return [UPDATE_REPO_RAW + "/" + name, UPDATE_REPO_JSD + "/" + name]
+
+    def _fetch_bytes(self, urls, timeout=15):
+        for u in urls:
+            try:
+                req = urllib.request.Request(u, headers={"User-Agent": "PCGuardian-Update"})
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    return r.read()
+            except Exception:
+                continue
+        return None
+
+    @staticmethod
+    def _sha256_bytes(b):
+        import hashlib
+        return hashlib.sha256(b).hexdigest()
+
+    @classmethod
+    def _sha256_file(cls, path):
+        import hashlib
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    def _check_update(self):
+        if "--demo" in sys.argv or getattr(self, "scorer_active", False):
+            return
+        man_b = self._fetch_bytes(self._update_urls("version.json"))
+        if not man_b:
+            self.log.write("[update] 清单获取失败（网络），本轮跳过")
+            return
+        man = json.loads(man_b.decode("utf-8"))
+        ver = str(man.get("version") or "")
+        state = self._update_state
+        files = man.get("files") or {}
+        changed = []
+        for name in UPDATE_FILES:
+            want = (files.get(name) or {}).get("sha256")
+            if not want:
+                continue
+            p = os.path.join(script_dir(), name)
+            local = self._sha256_file(p) if os.path.exists(p) else None
+            if local != want:
+                changed.append(name)
+        exe_info = man.get("exe") or {}
+        exe_new_path = os.path.join(script_dir(), "PCGuardian.exe.new")
+        exe_changed = False
+        if getattr(sys, "frozen", False) and exe_info.get("sha256"):
+            exe_changed = self._sha256_file(sys.executable) != exe_info["sha256"]
+            if not exe_changed and os.path.exists(exe_new_path):
+                os.remove(exe_new_path)          # 残留的已安装补丁清理
+        if not changed and not exe_changed:
+            if state.get("version") != ver:
+                state["version"] = ver
+                self.log.write("[update] 已是最新版本 %s" % ver)
+            return
+        # 下载有变化的文件（校验 sha256 后落盘为 .new）
+        for name in changed:
+            b = self._fetch_bytes(self._update_urls(name), timeout=60)
+            if not b:
+                self.log.write("[update] 下载失败 %s" % name)
+                return
+            if self._sha256_bytes(b) != (files.get(name) or {}).get("sha256"):
+                self.log.write("[update] 校验失败 %s，本轮放弃" % name)
+                return
+            with open(os.path.join(script_dir(), name + ".new"), "wb") as f:
+                f.write(b)
+            self.log.write("[update] 已下载 %s（%d 字节）" % (name, len(b)))
+        exe_ready = False
+        if exe_changed or os.path.exists(exe_new_path):
+            if not exe_changed and exe_info.get("sha256") and os.path.exists(exe_new_path) \
+                    and self._sha256_file(exe_new_path) == exe_info["sha256"]:
+                exe_ready = True
+            else:
+                url = exe_info.get("url")
+                if not url:
+                    self.log.write("[update] 清单未提供 exe 下载地址")
+                    return
+                b = self._fetch_bytes([url], timeout=300)
+                if not b:
+                    self.log.write("[update] exe 下载失败")
+                    return
+                if self._sha256_bytes(b) != exe_info.get("sha256"):
+                    self.log.write("[update] exe 校验失败")
+                    return
+                with open(exe_new_path, "wb") as f:
+                    f.write(b)
+                exe_ready = True
+        self._apply_update(changed, exe_ready and exe_new_path, ver)
+
+    def _apply_update(self, changed, exe_new_path, ver):
+        # .pyw 是数据文件，运行中覆盖安全；评分面板下次打开自动用新代码
+        for name in changed:
+            src_p = os.path.join(script_dir(), name + ".new")
+            if os.path.exists(src_p):
+                os.replace(src_p, os.path.join(script_dir(), name))
+        self._S = None
+        self._update_state["version"] = ver
+        self.log.write("[update] 程序文件已更新到 %s" % ver)
+        # 冻结 exe：需在锁定页安装（改名换位 + 重启），其他状态推迟到下轮
+        if getattr(sys, "frozen", False) and exe_new_path:
+            if self.mode != self.MODE_LOCKED:
+                self.log.write("[update] 新 exe 已就绪，等待回到锁定页后自动安装")
+                return
+            exe = sys.executable
+            old = exe + ".old"
+            try:
+                if os.path.exists(old):
+                    os.remove(old)
+            except Exception:
+                pass
+            try:
+                os.rename(exe, old)      # 运行中的 exe 允许重命名（Windows 特性）
+            except Exception as e:
+                self.log.write("[update] 旧 exe 重命名失败 %r（下次启动重试）" % e)
+                return
+            os.replace(exe_new_path, exe)
+            try:                          # 伪装副本 sysguard.exe 同步更新（若存在）
+                sg = os.path.join(os.path.dirname(exe), "sysguard.exe")
+                if os.path.exists(sg):
+                    import shutil
+                    shutil.copyfile(exe, sg)
+            except Exception:
+                pass
+            self.log.write("[update] 新 exe 已安装，准备重启")
+        # 重启应用新版本（bat 由本进程生成，路径/参数与本机安装方式一致）
+        bat = os.path.join(script_dir(), "update_restart.bat")
+        NL2 = chr(13) + chr(10)
+        args = " ".join('"%s"' % a for a in sys.argv[1:] if a != "--demo")
+        lines = ["@echo off", "timeout /t 2 /nobreak >nul"]
+        if getattr(sys, "frozen", False):
+            exe_dir = os.path.dirname(sys.executable)
+            lines.append('taskkill /f /im sysguard.exe >nul 2>&1')
+            lines.append('start "" "%s" %s' % (sys.executable, args))
+        else:
+            pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+            lines.append('cd /d "%s"' % script_dir())
+            if os.path.exists(pyw):
+                lines.append('start "" "%s" "guardian.pyw" %s' % (pyw, args))
+            else:
+                lines.append('start "" python "guardian.pyw" %s' % args)
+        lines.append("exit")
+        with open(bat, "w") as f:
+            f.write(NL2.join(lines) + NL2)
+        import subprocess as _sp
+        _sp.Popen(["cmd", "/c", bat], creationflags=0x08000000)
+        self.log.write("[update] 将在 2 秒后重启以应用新版本 %s" % ver)
+        try:
+            self.root.after(0, self.root.destroy)   # 结束当前实例（bat 会拉起新实例）
+        except Exception:
+            pass
+
+    def _update_loop(self):
+        time.sleep(90)                 # 启动缓冲：等数据/界面就绪
+        while not self._stop_up.is_set():
+            try:
+                if self.cfg.get("auto_update", True) and not getattr(self, "scorer_active", False) \
+                        and self.mode in (self.MODE_LOCKED, self.MODE_UNLOCKED):
+                    self._check_update()
+            except Exception as e:
+                try:
+                    self.log.write("[update] 检查异常 %r" % e)
+                except Exception:
+                    pass
+            hours = 6
+            try:
+                hours = max(1, int(self.cfg.get("update_hours") or 6))
+            except Exception:
+                pass
+            for _ in range(hours * 3600):
+                if self._stop_up.is_set():
+                    return
+                time.sleep(1)
 
     # ---- 内嵌评分（PCVoiceScore 模块加载进本进程，面板覆盖锁定页） ----
     def _score_module(self):
@@ -1413,7 +2604,7 @@ class Guardian:
         self.scorer_active = True
         self._hide_lock_sections()
         app.message("🎤 " + task["name"],
-                    ["正在准备本机语音识别引擎…（首次约需几秒）",
+                    ["正在连接云端语音识别…（小米 MiMo）",
                      "第 %d/%d 次尝试 · 达标线 %d 分 · 奖励 %d 分钟"
                      % (day.get("attempts"), max_att, task["threshold"], task["minutes"])])
         self.log.write("[ai] 内嵌评分面板已显示 task=%s 第 %s/%s 次" % (tid, day.get("attempts"), max_att))
@@ -1421,7 +2612,16 @@ class Guardian:
         def worker():
             result_box = {}
             try:
-                task_full, client, _ = S.load_task_and_client(tid, self.cfg.get("gist_url"))
+                if task.get("local"):
+                    # 本地媒体文件夹任务：不在分派数据里，任务配置直接取自扫描结果
+                    task_full = {"id": tid, "kind": task["kind"], "name": task["name"],
+                                 "minutes": task["minutes"], "threshold": task["threshold"],
+                                 "poem": False, "quiz": False,
+                                 "content": task.get("content") or ""}
+                    client = S.load_ai_client(self.cfg.get("gist_url"))
+                else:
+                    task_full, client, _ = S.load_task_and_client(tid, self.cfg.get("gist_url"))
+                app.client = client             # 供 🔊 听发音（MiMo TTS）使用
                 asr_fn, lang, _note = S.make_asr_for_task(task_full, client)
                 if task_full.get("quiz") and not client.chat_ok:
                     task_full = dict(task_full)
@@ -1430,10 +2630,10 @@ class Guardian:
                             ["达到 %d 分可得 %d 分钟" % (int(task_full.get("threshold") or 80),
                                                       int(task_full.get("minutes") or 0)),
                              "第 %d/%d 次尝试" % (day.get("attempts"), max_att),
-                             "本机离线识别（%s引擎）" % ("中文" if lang == "zh" else "英文"),
+                             "云端语音识别（小米 MiMo）",
                              "点击「🎤 开始阅读」开始"])
                 if task_full.get("kind") == "words":
-                    r = S.evaluate_words(task_full, app, asr_fn, __import__("random").Random())
+                    r = S.evaluate_words(task_full, app, asr_fn, __import__("random").Random(), client)
                 else:
                     chat = client.chat if (task_full.get("quiz") and client.chat_ok) else None
                     r = S.evaluate_read(task_full, app, asr_fn, chat, __import__("random").Random())
@@ -1574,17 +2774,57 @@ class Guardian:
         self.render()
 
     # ---- 右栏：待完成的任务（必做 + AI 待评任务带「开始任务」按钮 + 待家长打卡任务） ----
+    def _media_todo(self, kind):
+        """待完成的媒体任务：本地扫描的（带播放）+ 分派数据里的（等打卡，类型就绪前占位）"""
+        prog = self._load_media_progress()
+        done_ids = {t for t, p in prog.items() if p.get("done")}
+        out = []
+        for (tid, n, m, earned, k) in getattr(self, "dispatch_view", []):
+            if k == kind and not earned:
+                out.append({"type": "dispatch", "id": tid, "name": n, "minutes": m})
+        for mt in getattr(self, "local_media", []):
+            if mt["kind"] == kind and mt["id"] not in done_ids:
+                d = dict(mt)
+                d["type"] = "local"
+                d["pos"] = int(prog.get(mt["id"], {}).get("pos") or 0)
+                out.append(d)
+        return out
+
     def _render_todo_pane(self):
         sig = ([(tid, self.done_map.get(tid)) for tid, _ in self.required]
                + [(t["id"], t["pass"], t["attempts"], t["best"], t["minutes"]) for t in self.ai_tasks]
-               + [(tid, n, m) for (tid, n, m, earned, kind) in getattr(self, "dispatch_view", []) if not earned and not kind])
+               + [(tid, n, m) for (tid, n, m, earned, kind) in getattr(self, "dispatch_view", []) if not earned and not kind]
+               + [(m["id"], m.get("pos", 0), m["type"]) for c in ("watch", "listen")
+                  for m in self._media_todo(c)]
+               + [getattr(self, "_todo_tab", "read")])
         if sig == self._todo_sig:
             return
         self._todo_sig = sig
         for c in self.todo_inner.winfo_children():
             c.destroy()
+        # ---- Tab 按钮：与「📋 待完成的任务」同一行（标题左 / Tab 右） ----
+        for w in self.todo_tab_bar.winfo_children():
+            w.destroy()
         sml = self.sml
-        # 必做任务（家长打卡 / 绑定的 AI 任务通过即完成）
+        tab = getattr(self, "_todo_tab", "read")
+        # ---- Tab 切换：📖 阅读 / 🔤 单词 / 📺 视频 / 🎧 音频（带待办数量） ----
+        todo_ai = [t for t in self.ai_tasks if not t["pass"]]
+        counts = {"read": len([t for t in todo_ai if t.get("kind") == "read"]),
+                  "words": len([t for t in todo_ai if t.get("kind") == "words"]),
+                  "watch": len(self._media_todo("watch")),
+                  "listen": len(self._media_todo("listen"))}
+        for tid_, tname in (("read", "阅读"), ("words", "单词"),
+                            ("watch", "视频"), ("listen", "音频")):
+            active = (tab == tid_)
+            n = counts[tid_]
+            tk.Button(self.todo_tab_bar, text="%s %d" % (tname, n),
+                      font=("Microsoft YaHei UI", sml, "bold" if active else "normal"),
+                      bg="#3d3063" if active else "#1a2338",
+                      fg="#ffe08a" if active else "#8fa0bd",
+                      activebackground="#2a2a3a", relief="flat", cursor="hand2",
+                      padx=7, pady=1,
+                      command=lambda t=tid_: self._switch_todo_tab(t)).pack(side="left", padx=(4, 0))
+        # ---- 必做任务（家长打卡，任何 Tab 顶部都显示） ----
         for tid, name in self.required:
             ok = self.done_map.get(tid)
             tk.Label(self.todo_inner,
@@ -1592,43 +2832,129 @@ class Guardian:
                      font=("Microsoft YaHei UI", sml), bg="#1a2338",
                      fg="#7dd87f" if ok else "#e8ecf5", anchor="w",
                      justify="left").pack(fill="x", padx=8, pady=3)
-        # AI 评分任务（未通过的）：行 + 「开始任务」按钮
-        for t in self.ai_tasks:
-            if t["pass"]:
-                continue
-            if t["attempts"] >= t["max_attempts"]:
-                status = "今日次数已用完（最佳 %d 分，明天再来）" % t["best"]
-            elif t["attempts"]:
-                status = "最佳 %d 分 · 第 %d/%d 次 · ≥%d 分得 %d 分钟" % (
-                    t["best"], t["attempts"] + 1, t["max_attempts"], t["threshold"], t["minutes"])
+
+        def ai_rows(items):
+            for t in items:
+                if t["attempts"] >= t["max_attempts"]:
+                    status = "今日次数已用完（最佳 %d 分，明天再来）" % t["best"]
+                elif t["attempts"]:
+                    status = "最佳 %d 分 · 第 %d/%d 次 · ≥%d 分得 %d 分钟" % (
+                        t["best"], t["attempts"] + 1, t["max_attempts"], t["threshold"], t["minutes"])
+                else:
+                    if t.get("kind") == "words" and t.get("chars"):
+                        detail = "（共 %d 词）" % t["chars"]
+                    elif t.get("chars"):
+                        detail = "（共 %d 字）" % t["chars"]
+                    else:
+                        detail = ""
+                    status = "🎤 AI 评分%s · ≥%d 分得 %d 分钟" % (detail, t["threshold"], t["minutes"])
+                row = tk.Frame(self.todo_inner, bg="#1a2338")
+                row.pack(fill="x", padx=8, pady=3)
+                tk.Label(row, text="%s\n%s" % (t["name"], status),
+                         font=("Microsoft YaHei UI", sml), bg="#1a2338", fg="#cfd6e4",
+                         justify="left", anchor="w").pack(side="left", fill="x", expand=True, pady=4)
+                btn = tk.Button(row, text="🎤 开始任务", font=("Microsoft YaHei UI", sml, "bold"),
+                                bg="#4a3a78", fg="white", activebackground="#3d3063",
+                                activeforeground="white", relief="flat", cursor="hand2", padx=12,
+                                command=lambda tid=t["id"]: self.launch_scorer(tid))
+                if t["attempts"] >= t["max_attempts"]:
+                    btn.configure(state="disabled", bg="#2a2a3a", disabledforeground="#77778f")
+                btn.pack(side="right", padx=4)
+
+        def media_rows(items, kind):
+            """本地媒体：单文件各自一行；同子文件夹多集 → 合集行（从当前进度集继续，连续播放）"""
+            prog = self._load_media_progress()
+            colls, singles = {}, []
+            for it in items:
+                c = it.get("collection")
+                if c:
+                    colls.setdefault(c, []).append(it)
+                else:
+                    singles.append(it)
+            kind_name = "视频" if kind == "watch" else "音频"
+            def add_row(title, sub, it, btn_label):
+                row = tk.Frame(self.todo_inner, bg="#1a2338")
+                row.pack(fill="x", padx=8, pady=3)
+                tk.Label(row, text="%s\n%s" % (title, sub),
+                         font=("Microsoft YaHei UI", sml), bg="#1a2338", fg="#cfd6e4",
+                         justify="left", anchor="w").pack(side="left", fill="x", expand=True, pady=4)
+                tk.Button(row, text=btn_label, font=("Microsoft YaHei UI", sml, "bold"),
+                          bg="#1f5c8b", fg="white", activebackground="#174a70",
+                          activeforeground="white", relief="flat", cursor="hand2", padx=12,
+                                      command=lambda m=dict(it): self._safe_open_media(m)).pack(side="right", padx=4)
+            for it in singles:
+                pos = int(it.get("pos") or 0)
+                dur_info = (" · 时长约 %d 分钟" % round(it["duration_ms"] / 60000.0)) \
+                    if it.get("duration_ms") else ""
+                add_row(it["name"],
+                        "本地%s%s · %s奖励 %d 分钟" % (kind_name, dur_info,
+                            ("已看 %d:%02d，" % (pos // 60000, pos // 1000 % 60)) if pos else "看完后",
+                            it["minutes"]),
+                        it, "▶ 继续播放" if pos else ("▶ 开始观看" if kind == "watch" else "▶ 开始收听"))
+            for c in sorted(colls):
+                eps = sorted(colls[c], key=lambda x: x["name"])
+                all_eps = sorted([m for m in getattr(self, "local_media", [])
+                                  if m.get("collection") == c], key=lambda x: x["name"])
+                idx = next((i + 1 for i, e in enumerate(all_eps) if e["id"] == eps[0]["id"]), 1)
+                cur = eps[0]
+                pos = int(cur.get("pos") or 0)
+                add_row("合集「%s」 第%d/%d集：%s" % (c, idx, len(all_eps), cur["name"]),
+                        "连续播放 %d 集 · 每集完成分别计奖" % len(eps), cur,
+                        "▶ 继续播放" if pos else "▶ 播放合集")
+
+        def empty_hint():
+            tk.Label(self.todo_inner, text="（该分类暂无待完成任务）", font=("Microsoft YaHei UI", sml),
+                     bg="#141b2b", fg="#5a6478").pack(anchor="w", padx=12, pady=10)
+
+        if tab == "read":
+            items = [t for t in todo_ai if t.get("kind") == "read"]
+            if items:
+                ai_rows(items)
             else:
-                status = "🎤 AI 评分 · ≥%d 分得 %d 分钟" % (t["threshold"], t["minutes"])
-            row = tk.Frame(self.todo_inner, bg="#1a2338")
-            row.pack(fill="x", padx=8, pady=3)
-            tk.Label(row, text="%s\n%s" % (t["name"], status),
-                     font=("Microsoft YaHei UI", sml), bg="#1a2338", fg="#cfd6e4",
-                     justify="left", anchor="w").pack(side="left", fill="x", expand=True, pady=4)
-            btn = tk.Button(row, text="🎤 开始任务", font=("Microsoft YaHei UI", sml, "bold"),
-                            bg="#4a3a78", fg="white", activebackground="#3d3063",
-                            activeforeground="white", relief="flat", cursor="hand2", padx=12,
-                            command=lambda tid=t["id"]: self.launch_scorer(tid))
-            if t["attempts"] >= t["max_attempts"]:
-                btn.configure(state="disabled", bg="#2a2a3a", disabledforeground="#77778f")
-            btn.pack(side="right", padx=4)
-        # 普通分派任务（等家长打卡）
+                empty_hint()
+        elif tab == "words":
+            items = [t for t in todo_ai if t.get("kind") == "words"]
+            if items:
+                ai_rows(items)
+            else:
+                empty_hint()
+        elif tab == "watch":
+            items = self._media_todo("watch")
+            if items:
+                media_rows(items, "watch")
+            else:
+                empty_hint()
+        else:
+            items = self._media_todo("listen")
+            if items:
+                media_rows(items, "listen")
+            else:
+                empty_hint()
+        # 普通分派任务（等家长打卡；媒体类型在视频/音频 Tab 里）——任何 Tab 底部都显示
         for (_tid, n, m, _earned, _kind) in getattr(self, "dispatch_view", []):
+            if _kind in ("watch", "listen"):
+                continue
             tk.Label(self.todo_inner, text="⏳ %s · 奖励 %d 分钟（等家长打卡）" % (n, m),
                      font=("Microsoft YaHei UI", sml), bg="#1a2338", fg="#8fa0bd",
                      anchor="w", justify="left").pack(fill="x", padx=8, pady=3)
-        if not (self.required or self.ai_tasks or getattr(self, "dispatch_view", [])):
-            tk.Label(self.todo_inner, text="（暂无待完成任务）", font=("Microsoft YaHei UI", sml),
-                     bg="#141b2b", fg="#5a6478").pack(anchor="w", padx=12, pady=10)
+        # 切换 Tab / 重建列表后回到顶部（否则短列表停留在旧滚动位置，看起来像空列表）
+        try:
+            self.todo_canvas.yview_moveto(0)
+        except Exception:
+            pass
+
+    def _switch_todo_tab(self, t):
+        """待办列表 Tab 切换（阅读/单词/视频/音频）。"""
+        self._todo_tab = t
+        self._todo_sig = None
+        self.render()
 
     # ---- 解锁 HUD（屏幕顶部居中的浮窗，无法关闭）----
     def _hook_on(self):
         return not (self.demo or self.cfg["dry_run"])   # 测试模式不真的锁键盘
 
     def show_unlock(self):
+        self._close_media_panel()     # 解锁前收起媒体面板（暂停并记住进度，音频不会在后台继续响）
         try:
             self.root.withdraw()      # 解锁后主程序收起（键盘/任务栏交还给系统）
         except tk.TclError:
@@ -1645,9 +2971,22 @@ class Guardian:
         self.hud.attributes("-topmost", True)
         self.hud.attributes("-alpha", 0.9)
         self.hud.protocol("WM_DELETE_WINDOW", lambda: None)   # Alt+F4 也关不掉
-        tk.Label(self.hud, text="", font=("Microsoft YaHei UI", 14, "bold"),
-                 bg="#10141f", fg="#7ed957", padx=18, pady=8,
-                 highlightthickness=1, highlightbackground="#39415a").pack()
+        lbl = tk.Label(self.hud, text="", font=("Microsoft YaHei UI", 14, "bold"),
+                       bg="#10141f", fg="#7ed957", padx=18, pady=8,
+                       highlightthickness=1, highlightbackground="#39415a")
+        lbl.pack()
+        # 奖励轮：提供 ⏸ 暂停（保留剩余）/ ⏹ 结束（剩余退回钱包）——长奖励可分几次用
+        if self.reward_ids is not None and self.end_time is not None:
+            btns = tk.Frame(self.hud, bg="#10141f")
+            btns.pack(pady=(0, 6))
+            tk.Button(btns, text="⏸ 暂停并锁定", font=("Microsoft YaHei UI", 9, "bold"),
+                      bg="#2a2a3a", fg="#c8d4e8", activebackground="#3a3a4a",
+                      activeforeground="white", relief="flat", cursor="hand2", padx=8, pady=1,
+                      command=self._pause_reward_use).pack(side="left", padx=4)
+            tk.Button(btns, text="⏹ 结束退回", font=("Microsoft YaHei UI", 9, "bold"),
+                      bg="#2a2a3a", fg="#c8d4e8", activebackground="#3a3a4a",
+                      activeforeground="white", relief="flat", cursor="hand2", padx=8, pady=1,
+                      command=self._end_reward_use).pack(side="left", padx=4)
         if self.demo:
             self.hud.bind("<Double-Button-1>", lambda e: self.root.destroy())  # 测试模式：双击浮窗退出
         sw = self.hud.winfo_screenwidth()
@@ -1659,6 +2998,9 @@ class Guardian:
     def tick_unlock(self):
         if self.mode != self.MODE_UNLOCKED:
             return
+        self._eye_tick(time.time())
+        if self.eye_until is not None:
+            return                    # 护眼休息中：倒计时冻结（绿幕全屏覆盖）
         try:
             alive = self.hud is not None and bool(self.hud.winfo_exists())
         except tk.TclError:
@@ -1713,6 +3055,13 @@ class Guardian:
         except FileNotFoundError:
             print("[remove] 本来就没有自启动项")
 
+    def _open_mic_test(self):
+        """锁定页 🎤 试音：打开麦克风试音窗口（设备/音量/底噪诊断）。"""
+        try:
+            self._score_module().mic_test_app()
+        except Exception as e:
+            self.log.write("[mic-test] 打开失败 %r" % e)
+
     def _poll_interval(self):
         # 锁定时每 10 秒检查打卡（尽快解锁），解锁后按约定节奏轮询
         try:
@@ -1722,16 +3071,25 @@ class Guardian:
 
     # ---------- 启动 ----------
     def run(self):
+        if "--mic-test" in sys.argv:
+            # 麦克风试音工具：设备选择/音量诊断/回放（家长排查"识别不到孩子声音"）
+            try:
+                self._score_module().mic_test_app()
+            except Exception:
+                import traceback
+                print("[mic-test] FAIL\n" + traceback.format_exc())
+            return
         if "--selftest-voice" in sys.argv:
-            # 打包验收：验证冻结环境内 PCVoiceScore 及语音引擎可加载（不启动界面）
+            # 打包验收：验证冻结环境内 PCVoiceScore 可加载、评分组件完整（不启动界面）
             try:
                 S = self._score_module()
-                zh = S.LocalASR().available("zh"); en = S.LocalASR().available("en")
+                lang = (S.detect_lang({"content": ["think", "apple"]}) == "en"
+                        and S.detect_lang({"content": "秋天的雨是一把钥匙"}) == "zh")
                 w = S.word_score("think", "sink")        # 音标结构（pronouncing）
                 py = S._py("读") is not None             # 拼音容错（pypinyin）
-                self.log.write("[selftest] 语音组件 OK；模型 zh=%s en=%s；音标评分=%s 拼音=%s"
-                               % (zh, en, w, py))
-                print("[selftest] OK zh=%s en=%s phoneme=%s pinyin=%s" % (zh, en, w, py))
+                self.log.write("[selftest] 语音组件 OK；语言判定=%s 音标评分=%s 拼音=%s（识别统一走 MiMo 云端）"
+                               % (lang, w, py))
+                print("[selftest] OK lang=%s phoneme=%s pinyin=%s" % (lang, w, py))
             except Exception:
                 import traceback
                 self.log.write("[selftest] FAIL\n" + traceback.format_exc())

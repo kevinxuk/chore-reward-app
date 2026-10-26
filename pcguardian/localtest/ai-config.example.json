@@ -1,8 +1,9 @@
 {
-  "_说明": "复制为 ai-config.json 并填入你的真实信息（或通过家长端「🤖 AI设置」在线保存）",
-  "endpoint": "https://api.example.com/v1",
-  "apiKey": "sk-你的专用key",
-  "asrModel": "whisper-large-v3",
-  "chatModel": "glm-4-flash",
-  "fluentTs": true
+  "_说明": "复制为 ai-config.json 并填入你的真实信息（或通过家长端「🤖 AI设置」在线保存）。语音识别用小米 MiMo ASR，出题/判题用对话模型；单词发音用 MiMo TTS（ttsVoice 选音色，或 ttsStyle 填自然语言描述语速/语调/角色——填了 ttsStyle 走音色设计模型 mimo-v2.5-tts-voicedesign，以描述为准）",
+  "endpoint": "https://api.xiaomimimo.com/v1",
+  "apiKey": "你的MiMo key",
+  "asrModel": "mimo-v2.5-asr",
+  "chatModel": "mimo-v2.5",
+  "ttsVoice": "mimo_default",
+  "ttsStyle": ""
 }

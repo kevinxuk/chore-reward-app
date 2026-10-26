@@ -7,8 +7,10 @@
      打开时拉取 /api/data 覆盖本地，每次 saveState 后 0.5 秒 POST 回服务器；
   ② /api/data  ↔  C:/PCGuardian/localtest/chore-data.json（儿童端的数据源）：
      GET 返回当前数据，POST 校验 JSON 后写盘（儿童端 3~5 秒内读到）；
-  ③ /v1/chat/completions  mock 对话模型（问答任务的出题/判题，判分固定 88）；
-     /v1/audio/transcriptions mock 云端识别（儿童端本地引擎优先，一般用不到）。
+  ③ /v1/chat/completions  mock 模型接口，按请求体自动分流（与 MiMo 协议一致）：
+     - input_audio 请求 = 语音识别 mock：返回当前朗读任务的某一段/单词任务的某个词
+       （按调用次序轮转，段边界用 PCVoiceScore.segment_text 精确切分）；
+     - 其余 = 出题/判题 mock（判分固定 88）、AI 生成（短文/单词/古诗词）。
 
 用法：python lan_server.py     （Ctrl+C 停止）
 """
@@ -309,6 +311,25 @@ class Handler(SimpleHTTPRequestHandler):
 
     def _mock_chat(self, body):
         raw = body.decode("utf-8", "ignore")
+        if '"input_audio"' in raw:      # MiMo ASR：chat.completions + input_audio
+            lang = "en"
+            try:
+                lang = (json.loads(raw).get("asr_options") or {}).get("language") or "zh"
+            except Exception:
+                pass
+            text = self._mock_asr_text(lang)
+            print("[mock-asr][%s] %r" % (lang, text[:30]))
+            return self._json({"choices": [{"message": {"role": "assistant", "content": text}}]})
+        if '"audio"' in raw or "voicedesign" in raw:   # MiMo TTS（标准音色/音色设计）→ 静音 WAV
+            import base64 as _b64, io as _io, wave as _w
+            buf = _io.BytesIO()
+            with _w.open(buf, "wb") as w:
+                w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+                w.writeframes(b"\x00\x00" * 1600)
+            print("[mock-tts] 静音音频")
+            return self._json({"choices": [{"message": {
+                "role": "assistant",
+                "audio": {"data": _b64.b64encode(buf.getvalue()).decode()}}}]})
         content = ""
         try:
             msgs = json.loads(body.decode("utf-8")).get("messages", [])
@@ -318,7 +339,7 @@ class Handler(SimpleHTTPRequestHandler):
         if "古诗词" in raw and ("教材" in raw or "生成" in raw):
             reply = "《山行》 唐·杜牧\n远上寒山石径斜，白云生处有人家。停车坐爱枫林晚，霜叶红于二月花。\n\n《赠刘景文》 宋·苏轼\n荷尽已无擎雨盖，菊残犹有傲霜枝。一年好景君须记，最是橙黄橘绿时。\n\n《夜书所见》 宋·叶绍翁\n萧萧梧叶送寒声，江上秋风动客情。知有儿童挑促织，夜深篱落一灯明。"
         elif "短文" in raw and "生成" in raw:
-            reply = "秋天的风吹过了操场，树叶像小船一样飘下来。我们捡了很多金黄色的叶子，夹在课本里做书签。\n\n傍晚的时候，天空出现了美丽的晚霞。我和小伙伴坐在台阶上，看云变成了小狗和小马。\n\n晚上，秋虫在草丛里唱歌。妈妈说，秋天是一个收获的季节。"
+            reply = "【标题】秋天的风\n\n秋天的风吹过了操场，树叶像小船一样飘下来。我们捡了很多金黄色的叶子，夹在课本里做书签。\n\n傍晚的时候，天空出现了美丽的晚霞。我和小伙伴坐在台阶上，看云变成了小狗和小马。\n\n晚上，秋虫在草丛里唱歌。妈妈说，秋天是一个收获的季节。"
         elif "义务教育" in raw or ("单词" in raw and "列出" in raw):
             import re as _re
             m = _re.search("共(\d+)个", raw) or _re.search(r'"count"\s*:\s*(\d+)', raw)
@@ -334,6 +355,41 @@ class Handler(SimpleHTTPRequestHandler):
         else:
             reply = json.dumps({"score": 88, "reason": "答到了要点（mock 判分）"}, ensure_ascii=False)
         return self._json({"choices": [{"message": {"role": "assistant", "content": reply}}]})
+
+    _ASR_IDX = {"zh": 0, "en": 0}          # 识别调用次序：逐段/逐词轮转
+
+    def _mock_asr_text(self, lang):
+        """返回孩子"应该读到"的文本：朗读任务按 segment_text 精确切分后逐段轮转；
+        单词任务逐词轮转。重读会消耗轮转次数，属 mock 已知局限（真识别请配真实 key）。"""
+        try:
+            import importlib.util
+            if not hasattr(self.server, "_pcs_mod"):
+                path = os.path.join(REPO, "pcguardian", "PCVoiceScore.pyw")
+                spec = importlib.util.spec_from_file_location("pcs_mock", path)
+                m = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(m)
+                self.server._pcs_mod = m
+            S = self.server._pcs_mod
+            d = json.load(open(DATA_FILE, encoding="utf-8"))
+            tasks = ((d.get("config") or {}).get("dispatch") or {}).get("tasks") or []
+            if lang == "en":
+                t = next((x for x in tasks if isinstance(x, dict) and x.get("kind") == "words"), None)
+                words = (t or {}).get("content") or []
+                if isinstance(words, list) and words:
+                    i = self._ASR_IDX["en"]
+                    self._ASR_IDX["en"] += 1
+                    return str(words[i % len(words)])
+                return "apple"
+            t = next((x for x in tasks if isinstance(x, dict) and x.get("kind") == "read"), None)
+            segs = S.segment_text((t or {}).get("content") or "") if t else []
+            if segs:
+                i = self._ASR_IDX["zh"]
+                self._ASR_IDX["zh"] += 1
+                return segs[i % len(segs)]
+            return "秋天的雨，是一把钥匙，它带着清凉和温柔，轻轻地打开了秋天的大门。"
+        except Exception as e:
+            print("[mock-asr] 生成失败 %r" % e)
+            return "秋天的雨，是一把钥匙。"
 
     def _json(self, obj, code=200):
         data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -363,7 +419,7 @@ if __name__ == "__main__":
     print("  手机家长端 : http://%s:%d/index.html" % (lan_ip(), PORT))
     print("  本机家长端 : http://127.0.0.1:%d/index.html" % PORT)
     print("  数据文件   : %s（儿童端 3~5 秒内读取）" % DATA_FILE)
-    print("  mock 对话  : http://127.0.0.1:%d/v1 （问答任务判分固定 88）" % PORT)
+    print("  mock 模型  : http://127.0.0.1:%d/v1 （识别=任务原文轮转；判分固定 88；AI 生成）" % PORT)
     print("=" * 56)
     try:
         srv.serve_forever()

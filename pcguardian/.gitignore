@@ -13,3 +13,12 @@ screenshots/
 parent-output.json
 *e2e*.json
 seed-default.json
+dist/
+build/
+*.spec
+build_pkg/
+localtest/guardian.pyw
+localtest/PCVoiceScore.pyw
+localtest/ai-config-test.json
+localtest/update_server_sim/
+localtest/scorer-run.log

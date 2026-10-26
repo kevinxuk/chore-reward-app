@@ -233,6 +233,7 @@ except Exception:
     pass
 
 print("== R. 零花钱兑换电脑时长 ==")
+g.clear_reward_session()   # 前面段落可能留下未结束的奖励会话（恢复优先逻辑会把它还原出来）
 # 清兑换台账
 for f in ("guardian.redeem.json", "guardian.aiscore.json"):
     for base in (HERE, APPDATA):
@@ -254,6 +255,7 @@ def RDATA(records=None, computer=None, gameRate=5):
 
 check("R1 cloud_balance 口径=收入-支出", g.cloud_balance(RDATA()) == 25.0, g.cloud_balance(RDATA()))
 gr = g.Guardian(); gr.build_ui(); gr.root.withdraw()
+gr.redeem_enabled = True; gr.cfg["redeem_weekend_only"] = False   # 测试不依赖周末
 gr.apply_state(RDATA()); gr.render()
 check("R2 顶栏余额+兑换分布", "25.00" in gr.lb_money_total.cget("text")
       and len(gr.redeem_frame.winfo_children()) > 0 and "30分钟" in pane_texts(gr.redeem_frame),
@@ -279,6 +281,7 @@ try:
 except Exception:
     pass
 gr2 = g.Guardian(); gr2.build_ui(); gr2.root.withdraw()
+gr2.redeem_enabled = True; gr2.cfg["redeem_weekend_only"] = False
 gr2.apply_state(RDATA()); gr2.render()
 check("R9 重启后台账生效(余额15)", gr2._money_left() == 15.0 and "15.00" in gr2.lb_money_total.cget("text"))
 check("R10 已兑换时长跨重启在钱包", sum(1 for w in gr2.wallet if w["id"].startswith("rd-")) == 2)
@@ -288,6 +291,7 @@ gr2.render()
 check("R11 关闭后兑换分布隐藏", not gr2.redeem_frame.winfo_manager())
 # 余额不足
 gr3 = g.Guardian(); gr3.build_ui(); gr3.root.withdraw()
+gr3.redeem_enabled = True; gr3.cfg["redeem_weekend_only"] = False
 gr3.apply_state(RDATA(records={"2026-10-20": {"t99": {"done": True, "amount": 3}}},
                        computer={"minutes": 30, "unlock": False, "redeem": {"enabled": True, "dailyCap": 50}}))
 gr3.render()
@@ -334,6 +338,320 @@ gu3.render(); hide_hud(gu3)
 check("D6 家长解锁救回关机", gu3.mode == gu3.MODE_UNLOCKED and gu3.end_time is None)
 try:
     gu3.root.destroy()
+except Exception:
+    pass
+
+print("== M. 本地媒体文件夹（扫描/MD 解析/奖励/进度） ==")
+g.clear_reward_session()
+MEDIA_TMP = os.path.join(APPDATA, "media_test")
+os.makedirs(MEDIA_TMP, exist_ok=True)
+with open(os.path.join(MEDIA_TMP, "Unit3单词.md"), "w", encoding="utf-8") as f:
+    f.write("# Unit3 单词\nthink\napple\ncar\n")
+with open(os.path.join(MEDIA_TMP, "秋天的雨.md"), "w", encoding="utf-8") as f:
+    f.write("## 朗读：秋天的雨\n" + "秋天的雨，是一把钥匙，带着清凉和温柔打开了秋天的大门。\n"
+            "它把黄色给了银杏树，把红色给了枫树，把金黄色给了田野和果树。\n")
+with open(os.path.join(MEDIA_TMP, "test.mp3"), "wb") as f:
+    f.write(b"ID3fake")
+with open(os.path.join(MEDIA_TMP, "test.mp4"), "wb") as f:
+    f.write(b"fake")
+
+gu4 = g.Guardian()
+gu4.build_ui()
+gu4.root.withdraw()
+gu4.cfg["media_dir"] = MEDIA_TMP
+scan = gu4._scan_local_tasks()
+check("M1 MD→单词任务", any(t["kind"] == "words" and t["name"] == "Unit3 单词"
+                            and t["content"] == ["think", "apple", "car"] for t in scan["docs"]),
+      [(t["kind"], t["name"]) for t in scan["docs"]])
+check("M2 MD→朗读任务", any(t["kind"] == "read" and "秋天的雨" in t["content"] for t in scan["docs"]),
+      [(t["kind"], t["name"]) for t in scan["docs"]])
+check("M3 音视频识别分类", {m["kind"] for m in scan["media"]} == {"listen", "watch"}, scan["media"])
+if scan["docs"]:
+    check("M4 任务ID稳定(内容不变ID不变)", gu4._scan_local_tasks()["docs"][0]["id"] == scan["docs"][0]["id"])
+
+# 媒体播放完成 → 奖励发放一次（用 watch 的 mp4 测；listen 的 mp3 留在待办里）
+mid = next(m["id"] for m in scan["media"] if m["kind"] == "watch")
+prog = gu4._load_media_progress()
+prog[mid] = {"done": True, "pos": 999, "name": "test"}
+gu4._save_media_progress(prog)
+gu4.local_scan = scan
+gu4.local_media = scan["media"]
+g.save_ai_score({"results": {}, "rewards": []})
+gu4.ai_doc = g.load_ai_score()
+gu4._grant_local_rewards()
+rewards = g.load_ai_score().get("rewards", [])
+check("M5 媒体完成发奖励一次", len([r for r in rewards if r["task"] == mid]) == 1, rewards)
+gu4._grant_local_rewards()
+rewards = g.load_ai_score().get("rewards", [])
+check("M6 重复发放只记一次", len([r for r in rewards if r["task"] == mid]) == 1, rewards)
+
+# apply_state 后本地 MD 任务并入 AI 任务列表（分类区可见、可开始评分）；音视频进入播放待办
+gu4.apply_state(DATA(computer={"minutes": 30, "unlock": False, "required": []}))
+check("M7 本地MD任务并入AI任务列表", any(t.get("local") and t["kind"] == "words" for t in gu4.ai_tasks),
+      [(t["kind"], t.get("local")) for t in gu4.ai_tasks])
+check("M8 完成的移出待办、未完成的在待办", len(gu4._media_todo("watch")) == 0
+      and len(gu4._media_todo("listen")) == 1,
+      (gu4._media_todo("listen"), gu4._media_todo("watch")))
+# 合集：子文件夹 = 合集，集内连续播放
+COLL = os.path.join(MEDIA_TMP, "纪录片蓝猫")
+os.makedirs(COLL, exist_ok=True)
+for i, fn in enumerate(("01.mp3", "02.mp3")):
+    with open(os.path.join(COLL, fn), "wb") as f:
+        f.write(b"ID3fake%d" % i)
+scan2 = gu4._scan_local_tasks()
+coll_items = [m for m in scan2["media"] if m.get("collection") == "纪录片蓝猫"]
+check("M9 子文件夹→合集（递归扫描）", len(coll_items) == 2
+      and all(m["kind"] == "listen" for m in coll_items), scan2["media"])
+todo_l = gu4._media_todo("listen") if hasattr(gu4, "local_media") else []
+gu4.local_scan = scan2
+gu4.local_media = scan2["media"]
+todo_l = [m for m in gu4._media_todo("listen") if m.get("collection") == "纪录片蓝猫"]
+check("M10 合集待办含当前集（第一集）", len(todo_l) == 2 and todo_l[0]["name"] == "01", todo_l)
+nxt = gu4._next_episode(todo_l[0])
+check("M11 合集连播：下一集正确", nxt is not None and nxt["name"] == "01", nxt)
+prog = gu4._load_media_progress()
+prog[todo_l[0]["id"]] = {"done": True, "pos": 0}
+gu4._save_media_progress(prog)
+nxt2 = gu4._next_episode(todo_l[0])
+check("M12 第一集完成后接第二集", nxt2 is not None and nxt2["name"] == "02", nxt2)
+
+# M14: 完成的任务文件自动归档到 media\已完成\（不再重复识别为任务）
+doc_t = next(t for t in scan["docs"] if t["kind"] == "read")
+g.save_ai_score({"results": {doc_t["id"]: {g.today_key(): {"attempts": 1, "best": 95, "pass": True}}},
+                 "rewards": []})
+gu4.ai_doc = g.load_ai_score()
+gu4._grant_local_rewards()
+done_dir = os.path.join(MEDIA_TMP, "已完成")
+archived = os.path.join(done_dir, os.path.basename(doc_t["path"]))
+check("M14a 完成文件归档到已完成文件夹", os.path.exists(archived)
+      and not os.path.exists(doc_t["path"]), (archived, doc_t["path"]))
+scan3 = gu4._scan_local_tasks()
+check("M14b 归档后不再扫描为任务", all(t["id"] != doc_t["id"] for t in scan3["docs"]))
+prog_all = gu4._load_media_progress()
+check("M14c 进度标记隐藏(归档失败的保险)", bool(prog_all.get(doc_t["id"], {}).get("done")))
+gu4.apply_state(DATA(computer={"minutes": 30, "unlock": False, "required": []}))
+check("M14d apply_state 不再并入已完成文档", all(t["id"] != doc_t["id"] for t in gu4.ai_tasks))
+
+# M15: 类型文件夹——阅读/单词/视频/音频，类型以文件夹为准
+d_read = os.path.join(MEDIA_TMP, "阅读"); os.makedirs(d_read, exist_ok=True)
+d_words = os.path.join(MEDIA_TMP, "单词"); os.makedirs(d_words, exist_ok=True)
+d_watch = os.path.join(MEDIA_TMP, "视频"); os.makedirs(d_watch, exist_ok=True)
+d_listen = os.path.join(MEDIA_TMP, "音频"); os.makedirs(d_listen, exist_ok=True)
+with open(os.path.join(d_read, "阅读夹里的单词样式.md"), "w", encoding="utf-8") as f:
+    f.write("单词样式\nthink\napple\ncar\n")          # 单词样式内容 → 放阅读夹 = 朗读任务
+with open(os.path.join(d_words, "Unit9.md"), "w", encoding="utf-8") as f:
+    f.write("Unit9\nsunny\ncloudy\nrainy\n")
+with open(os.path.join(d_watch, "ep.mp4"), "wb") as f:
+    f.write(b"x")
+with open(os.path.join(d_listen, "ep.mp3"), "wb") as f:
+    f.write(b"y")
+scan4 = gu4._scan_local_tasks()
+rd = next(t for t in scan4["docs"] if t["name"] == "单词样式")
+wd = next(t for t in scan4["docs"] if t["name"].endswith("Unit9"))
+check("M15a 阅读夹内容一律朗读任务", rd["kind"] == "read", rd["kind"])
+check("M15b 单词夹内容一律单词任务", wd["kind"] == "words", wd["kind"])
+check("M15c 视频音频夹按类型收任务",
+      any(m["kind"] == "watch" for m in scan4["media"] if "视频" in m["path"])
+      and any(m["kind"] == "listen" for m in scan4["media"] if "音频" in m["path"]),
+      [(m["kind"], m["path"]) for m in scan4["media"]])
+
+# M16: 阅读任务按字数计奖励（每 250 字 = 10 分钟，不足 250 字按 10 分钟起）
+long_text = "今天天气真好，我和小伙伴们一起去公园里玩耍，我们看到了很多美丽的花朵和绿油油的小草。" * 12   # ≈ 504 字
+short_text = "秋天来了，树叶黄了，一群大雁往南飞，一会儿排成个人字，一会儿排成个一字，真是好看极了。"
+with open(os.path.join(d_read, "长课文.md"), "w", encoding="utf-8") as f:
+    f.write("长课文\n" + long_text)
+with open(os.path.join(d_read, "短课文.md"), "w", encoding="utf-8") as f:
+    f.write("短课文\n" + short_text)
+scan5 = gu4._scan_local_tasks()
+ml = next(t for t in scan5["docs"] if t["name"] == "长课文")
+ms = next(t for t in scan5["docs"] if t["name"] == "短课文")
+check("M16a 长文按250字=10分钟计", ml["minutes"] == round(ml["chars"] / 250.0 * 10)
+      and ml["minutes"] >= 20, (ml["chars"], ml["minutes"]))
+check("M16b 短文保底10分钟", ms["minutes"] == 10, (ms["chars"], ms["minutes"]))
+
+# M17: 单词任务按行数计奖励（每行 0.5 分钟，多行汇总）
+with open(os.path.join(d_words, "十个词.md"), "w", encoding="utf-8") as f:
+    f.write("十个词\n" + "\n".join("w%d" % i for i in range(10)))
+with open(os.path.join(d_words, "二十个词.md"), "w", encoding="utf-8") as f:
+    f.write("二十个词\n" + "\n".join("q%d" % i for i in range(20)))
+scan6 = gu4._scan_local_tasks()
+t10 = next(t for t in scan6["docs"] if t["name"] == "十个词")
+t20 = next(t for t in scan6["docs"] if t["name"] == "二十个词")
+check("M17a 10行=5分钟", t10["minutes"] == 5 and t10["chars"] == 10, (t10["chars"], t10["minutes"]))
+check("M17b 20行=10分钟", t20["minutes"] == 10, (t20["chars"], t20["minutes"]))
+
+# M18: 音视频计奖 = 播放总时长 ÷ 2（时长解析 + 换算）
+import wave as _wave
+with _wave.open(os.path.join(d_listen, "长音频.wav"), "wb") as w:      # 120 秒 → 奖励 1 分钟
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+    w.writeframes(b"\x00\x00" * 16000 * 120)
+scan7 = gu4._scan_local_tasks()
+au = next(m for m in scan7["media"] if m["name"] == "长音频")
+check("M18a 音频时长解析(≈120秒)", abs(au["duration_ms"] - 120000) < 1500, au["duration_ms"])
+check("M18b 奖励=时长÷2(120秒→1分钟)", au["minutes"] == 1, au["minutes"])
+try:
+    import cv2 as _cv2b
+    import numpy as _np2
+    vp = os.path.join(d_watch, "一分钟测试.mp4")
+    vw = _cv2b.VideoWriter(vp, _cv2b.VideoWriter_fourcc(*"mp4v"), 15, (320, 180))
+    for i in range(15 * 60):                     # 60 秒
+        vw.write(_np2.zeros((180, 320, 3), dtype=_np2.uint8))
+    vw.release()
+    scan8 = gu4._scan_local_tasks()
+    vd = next(m for m in scan8["media"] if m["kind"] == "watch" and m["name"] == "一分钟测试")
+    check("M18c 视频时长÷2(60秒→1分钟)", abs(vd["duration_ms"] - 60000) < 2000
+          and vd["minutes"] == 1, (vd["duration_ms"], vd["minutes"]))
+except Exception as e:
+    print("  SKIP  M18c（cv2 不可用）：%r" % e)
+check("M18d 时长缓存生效(同ID不重测)", gu4._scan_local_tasks()["media"][0]["duration_ms"]
+      == scan7["media"][0]["duration_ms"])
+
+# M19: 媒体行渲染回归（文案格式错误会让整个媒体区块消失）
+def _all_text(widget, acc):
+    for w in widget.winfo_children():
+        try:
+            acc.append(str(w.cget("text")))
+        except Exception:
+            pass
+        _all_text(w, acc)
+gu4.local_media = scan8["media"]
+gu4._todo_tab = "watch"
+gu4._todo_sig = None
+gu4.render()
+txts = []
+_all_text(gu4.todo_inner, txts)
+check("M19 媒体行渲染完整(本地/时长/奖励齐全)", any("本地视频" in t for t in txts)
+      and any("时长约" in t for t in txts) and any("奖励" in t for t in txts), txts[:6])
+
+# M13: 防跳看——视频时长解析 + 观看时长判定
+with open(os.path.join(MEDIA_TMP, "ten_sec.mp4"), "wb") as f:
+    pass
+try:
+    import cv2 as _cv2
+    import numpy as _np
+    vw = _cv2.VideoWriter(os.path.join(MEDIA_TMP, "ten_sec.mp4"),
+                          _cv2.VideoWriter_fourcc(*"mp4v"), 15, (320, 180))
+    for i in range(150):
+        vw.write(_np.zeros((180, 320, 3), dtype=_np.uint8))
+    vw.release()
+    dur = g._video_duration_ms(os.path.join(MEDIA_TMP, "ten_sec.mp4"))
+    check("M13a 视频时长解析(≈10秒)", abs(dur - 10000) < 1500, dur)
+    ok1, r1 = g._watch_enough(dur, 5)          # 只看 5 秒 → 拒绝
+    ok2, r2 = g._watch_enough(dur, 120)        # 看 2 分钟 → 通过
+    check("M13b 防跳判定(短拒长过)", (not ok1) and ok2 and r1 > 0, (ok1, ok2, r1, r2))
+    ok3, _ = g._watch_enough(0, 60)            # 时长未知 → 需 20 分钟
+    ok4, _ = g._watch_enough(0, 1300)
+    check("M13c 时长未知需20分钟", (not ok3) and ok4)
+except Exception as e:
+    print("  SKIP  M13（cv2 不可用）：%r" % e)
+os.remove(os.path.join(MEDIA_TMP, "ten_sec.mp4"))
+
+try:
+    gu4.root.destroy()
+except Exception:
+    pass
+shutil.rmtree(MEDIA_TMP, ignore_errors=True)
+
+print("== N. 奖励轮暂停/继续/提前结束退回 ==")
+gu5 = g.Guardian()
+gu5.build_ui()
+gu5.root.withdraw()
+gu5.apply_state(DATA(computer={"minutes": 30, "unlock": False, "required": []}))
+gu5.enter_unlock(parent=False, reward=(120 * 60, ["r1"]))   # 120 分钟奖励轮
+check("N1 奖励轮进入", gu5.mode == g.Guardian.MODE_UNLOCKED and gu5.reward_ids == ["r1"])
+gu5.end_time = time.time() + 100 * 60                        # 剩 100 分钟
+gu5._pause_reward_use()
+check("N2 暂停→回锁定页", gu5.mode == g.Guardian.MODE_LOCKED)
+rstate, rend = g.load_reward_session()
+check("N3 会话保留可恢复(剩余秒数≈100分钟)", rstate == "paused"
+      and 90 * 60 < rend <= 101 * 60, (rstate, rend))
+spent_before = len(g.load_spent())
+gu5.start_reward_use()
+check("N4 开始使用→恢复奖励轮(不重复扣台账)", gu5.mode == g.Guardian.MODE_UNLOCKED
+      and gu5.reward_ids == [] and len(g.load_spent()) == spent_before)
+# 跨天恢复：把会话日期改成昨天
+try:
+    p0 = g._reward_session_paths()[0]
+    if os.path.exists(p0):
+        os.remove(p0)                        # 隐藏文件需先删再写
+    d0 = {"date": "2000-01-01", "paused": True, "remaining": 100 * 60,
+          "end_time": time.time() - 86400, "unlock_start": time.time() - 90000}
+    json.dump(d0, open(p0, "w", encoding="utf-8"))
+    rstate2, rend2 = g.load_reward_session()
+    check("N5 跨天仍可恢复", rstate2 == "paused" and rend2 == 100 * 60, (rstate2, rend2))
+except Exception as e:
+    check("N5 跨天仍可恢复", False, repr(e))
+# 提前结束 → 剩余退回钱包
+gu5.end_time = time.time() + 30 * 60
+gu5._end_reward_use()
+rewards_n = g.load_ai_score().get("rewards", [])
+check("N6 结束→剩余30分钟退回", gu5.mode == g.Guardian.MODE_LOCKED
+      and len([r for r in rewards_n if str(r.get("task", "")).startswith("resume")
+               and r.get("minutes") == 30]) == 1, rewards_n)
+# N6b: 向上取整——剩 29:30 也退整 30 分钟（不丢零头）
+gu5.enter_unlock(parent=False, reward=(60 * 60, ["r5"]))
+gu5.end_time = time.time() + 30 * 60 - 30
+gu5._end_reward_use()
+rewards_n2 = g.load_ai_score().get("rewards", [])
+check("N6b 剩29:30退整30分钟", len([r for r in rewards_n2 if str(r.get("task", "")).startswith("resume")
+                                    and r.get("minutes") == 30]) >= 1, rewards_n2[-3:])
+gu5.apply_state(DATA(computer={"minutes": 30, "unlock": False, "required": []}))
+check("N7 退回时间入钱包", any(w["minutes"] == 30 and "剩余" in w["name"] for w in gu5.wallet),
+      gu5.wallet)
+
+# N8: 护眼模式——每 35 分钟全屏绿幕休息 3 分钟（休息不扣倒计时）
+gu5.eye_base = time.time() - 36 * 60          # 已使用 36 分钟
+gu5.end_time = time.time() + 60 * 60
+gu5._eye_tick(time.time())
+check("N8a 满35分钟触发绿幕", gu5.eye_overlay is not None and gu5.eye_until is not None)
+end_frozen = gu5.end_time
+time.sleep(1.1)
+gu5._eye_tick(time.time())
+check("N8b 休息期间倒计时冻结", abs(gu5.end_time - end_frozen) < 0.5
+      or gu5.end_time >= end_frozen, (end_frozen, gu5.end_time))
+gu5.eye_until = time.time() - 1               # 休息结束
+gu5._eye_tick(time.time())
+check("N8c 休息结束绿幕关闭并重新累计", gu5.eye_overlay is None
+      and gu5.eye_base is not None and (time.time() - gu5.eye_base) < 5)
+check("N8d 休息时间不扣使用时长", gu5.end_time >= end_frozen - 0.5)
+gu5._eye_abort()
+
+# N9: 暂停/结束时同步收起媒体面板（此前面板会盖住锁定页导致无法操作）
+os.makedirs(MEDIA_TMP, exist_ok=True)
+with _wave.open(os.path.join(MEDIA_TMP, "panel_test.wav"), "wb") as w:
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+    w.writeframes(b"\x00\x00" * 16000 * 120)     # 120 秒，避免“瞬间播完”触发完成
+gu5.enter_unlock(parent=False, reward=(60 * 60, ["r2"]))
+gu5.cfg["media_dir"] = MEDIA_TMP
+mt9 = {"id": "med_t9", "kind": "listen", "name": "面板测试",
+       "path": os.path.join(MEDIA_TMP, "panel_test.wav"), "collection": "",
+       "minutes": 1, "local": True}
+gu5.local_media = [mt9]
+gu5.open_media_player(dict(mt9))
+check("N9a 播放面板已打开", gu5.media_panel is not None)
+gu5._pause_reward_use()
+check("N9b 暂停时媒体面板同步收起", gu5.media_panel is None
+      and gu5._media_state is None and gu5.mode == g.Guardian.MODE_LOCKED)
+check("N9c 媒体进度已保留", "pos" in gu5._load_media_progress().get("med_t9", {}),
+      gu5._load_media_progress().get("med_t9"))
+check("N9d 奖励会话仍保留可续", g.load_reward_session()[0] == "paused")
+gu5.start_reward_use()
+gu5._end_reward_use()
+g.clear_reward_session()
+
+# N10: 暂停期间墙钟流逝不扣时间（本 bug 的核心回归：旧实现存时间点，暂停=照扣）
+gu5.enter_unlock(parent=False, reward=(60 * 60, ["r4"]))
+gu5.end_time = time.time() + 50 * 60
+gu5._pause_reward_use()
+time.sleep(3)                                  # 暂停挂 3 秒
+gu5.start_reward_use()
+left = gu5.end_time - time.time()
+check("N10 暂停期间不流失(3秒后仍≈50分钟)", gu5.mode == g.Guardian.MODE_UNLOCKED
+      and 49 * 60 < left <= 50 * 60, left)
+gu5._end_reward_use()
+g.clear_reward_session()
+try:
+    gu5.root.destroy()
 except Exception:
     pass
 
