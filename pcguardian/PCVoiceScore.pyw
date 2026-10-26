@@ -61,6 +61,21 @@ try:
 except Exception:
     pronouncing = None
 
+def _net_hint(e):
+    """把底层网络异常翻译成人话（孩子电脑排障用）。"""
+    s = "%r" % (e,)
+    if "getaddrinfo" in s or "Name or service" in s or "No such host" in s or "11001" in s:
+        return "域名解析失败（网络不通或 DNS 异常）"
+    if "SSL" in s or "certificate" in s or "CERTIFICATE" in s:
+        return "SSL 证书错误（最常见原因：电脑系统日期不正确，请校准时间）"
+    if "timed out" in s or "timeout" in s.lower():
+        return "连接超时（网络慢或被防火墙拦截）"
+    if "Connection refused" in s or "10061" in s:
+        return "连接被拒绝（端口不通）"
+    if "10060" in s or "unreachable" in s:
+        return "网络不可达"
+    return ""
+
 # ---------------------------------------------------------------- AI 客户端（OpenAI 兼容）
 class AIClient:
     def __init__(self, cfg):
@@ -108,7 +123,7 @@ class AIClient:
             except Exception as e:
                 last = e
                 time.sleep(1 + i)
-        raise RuntimeError("请求失败 %s: %r" % (url, last))
+        raise RuntimeError("请求失败 %s: %r %s" % (url, last, _net_hint(last)))
 
     def transcribe(self, wav_bytes, lang="zh", timeout=90, prompt=None):
         """小米 MiMo ASR：chat.completions + input_audio（base64）。
@@ -1642,6 +1657,8 @@ def _asr_noisy(lang, s):
 
 def make_asr(client, lang="zh"):
     def asr_fn(wav, dur):
+        slog("识别端点：%s model=%s" % (getattr(client, "endpoint", "?"),
+                                       getattr(client, "asr_model", "?")))
         t0 = time.time()
         wav_s, voice_ms = _trim_silence(wav)
         if not wav_s:

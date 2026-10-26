@@ -2679,6 +2679,12 @@ class Guardian:
                 import traceback
                 result_box["err"] = traceback.format_exc()
                 self.log.write("[ai] 评分异常 " + result_box["err"][-500:])
+                try:
+                    err_last = [l for l in result_box["err"].splitlines() if l.strip()][-1]
+                    app.message("⚠ 评分出错，请把本行文字发给家长",
+                                [err_last[:160], "点击「关闭」回到锁定页"])
+                except Exception:
+                    pass
             finally:
                 r = result_box.get("r") or {"score": 0, "pass": False, "recordings": 0}
                 S.finish_attempt(tid, r)
