@@ -1,17 +1,17 @@
 {
-  "version": "2026-10-25.47",
+  "version": "2026-10-25.49",
   "files": {
     "PCVoiceScore.pyw": {
       "sha256": "6fa10aa208a71553d7c1397012e34d6dcfd51910ea168941e08483c9a3cd03dc"
     },
     "guardian.pyw": {
-      "sha256": "d8b983daca443332ab57723fe3f0755f030ca5aa7cc36696167eb085b8e7976a"
+      "sha256": "439de04bd42d4712272016147b6f9c63a6f2a823b887b47c785bf4ffcee16e74"
     }
   },
   "exe": {
-    "version": "2026-10-25.47",
-    "sha256": "689352793939a6defc21d87a2a45e929e3a98461852d5c60fd4632ffe0290d38",
-    "size": 110277204,
+    "version": "2026-10-25.49",
+    "sha256": "ac9ad95626749d23d91fbfa398e215685e6d57ef25c6ba13d5250c965cfc7fe3",
+    "size": 110278751,
     "url": "https://github.com/kevinxuk/chore-reward-app/releases/latest/download/PCGuardian.exe"
   }
 }

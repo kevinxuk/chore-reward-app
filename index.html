@@ -1403,6 +1403,7 @@ async function saveAiCfgToGist(cfg){
   const c=syncCfg();
   if(!(c.gistId && c.token)) throw new Error("本机云同步未启用：请先点顶栏 ☁️ 完成配置");
   const files={["ai-config.json"]:{content: JSON.stringify(cfg, null, 2)}};
+  if(cfg._webTasks) files["web-earn-tasks.json"]={content: JSON.stringify(cfg._webTasks, null, 2)};
   let gistId=state.config.ai.cfgGistId||null, owner=null;
   const H={Authorization:"Bearer "+c.token, Accept:"application/vnd.github+json", "Content-Type":"application/json"};
   if(gistId){
@@ -1464,6 +1465,15 @@ function openAISettings(){
     <label style="font-size:.78rem;color:var(--ink2)">音色描述（可选，填了则优先于发音角色；想读得快就写"语速偏快"）</label>
     <input id="aiTtsStyle" type="text" placeholder="例：语速偏慢、吐字清晰的温柔女声，适合给小学生读单词" style="width:100%">
     <button type="button" id="aiTtsPrev" class="m-cancel" style="width:100%;margin-top:8px">🔊 试听发音（按当前发音角色/音色描述）</button>
+    <div style="border-top:1px solid #eee;margin:12px 0 8px"></div>
+    <p style="font-size:.74rem;color:#666;margin:4px 0 8px"><b>🌐 网页版赚时间</b>（平板/手机浏览器）——
+      部署 CF Worker 后把地址填到这里（部署步骤见使用说明「网页版赚时间」）。
+      孩子在浏览器打开 Worker 地址即可完成朗读/单词/看视频/听音频任务，奖励自动入电脑钱包。</p>
+    <label style="font-size:.78rem;color:var(--ink2)">Worker 地址（https://xxx.workers.dev）</label>
+    <input id="aiWeb" type="text" placeholder="https://my-earn.xxx.workers.dev" style="width:100%">
+    <label style="font-size:.78rem;color:var(--ink2)">音视频任务清单（每行：名称|https://文件直链|时长秒；留空=暂无）</label>
+    <textarea id="aiWebMedia" rows="3" style="width:100%;font-size:12px"
+      placeholder="BBC听力第一课|https://example.com/a1.mp3|300"></textarea>
     <p class="m-err" id="aiMsg" style="min-height:1.2em"></p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
       <button type="button" id="aiCopy" class="m-cancel">复制JSON</button>
@@ -1495,6 +1505,10 @@ function openAISettings(){
     set("#aiTtsVoice",old.ttsVoice||"mimo_default"); set("#aiTtsStyle",old.ttsStyle);
     if(old.apiKey) mask.querySelector("#aiKey").placeholder="已保存（留空=不修改）";
     syncTtsUI();
+    const we=(state.config.web_earn||{});
+    if(we.url && !mask.querySelector("#aiWeb").value) mask.querySelector("#aiWeb").value=we.url;
+    if(we.media && we.media.length && !mask.querySelector("#aiWebMedia").value)
+      mask.querySelector("#aiWebMedia").value=we.media.map(m=>[m.name,m.url,m.duration].join("|")).join(String.fromCharCode(10));
   }catch(e){} })();
   const close=()=>{ mask.classList.remove("show"); setTimeout(()=>mask.remove(),260); };
   const born=Date.now();          // 出生保护：移动端点按钮的第二次合成点击会落在遮罩上，500ms 内忽略
@@ -1507,6 +1521,8 @@ function openAISettings(){
     chatModel:(mask.querySelector("#aiChat").value||"").trim(),
     ttsVoice:(mask.querySelector("#aiTtsVoice").value||"").trim(),
     ttsStyle:(mask.querySelector("#aiTtsStyle").value||"").trim(),
+    webUrl:(mask.querySelector("#aiWeb").value||"").trim(),
+    webMedia:(mask.querySelector("#aiWebMedia").value||"").trim(),
   });
   const msg=(t,isErr)=>{const el=mask.querySelector("#aiMsg"); el.textContent=t||""; el.style.color=isErr?"var(--red)":"var(--green)";};
   mask.querySelector("#aiCopy").onclick=()=>{
@@ -1580,6 +1596,15 @@ function openAISettings(){
     if(!c0.endpoint||!c0.asrModel||!c0.chatModel){ msg("请填写完整（endpoint / 识别模型 / 对话模型）",true); return; }
     const c=await withKey(c0);
     if(!c){ msg("请填写 API Key（首次配置必填）",true); return; }
+    c._webTasks={listen:[],watch:[]};
+    (c.webMedia||"").split(new RegExp("[\r\n]+")).forEach(l=>{
+      const m=l.split("|").map(x=>(x||"").trim());
+      if(m.length>=2 && /^https?:\/\//.test(m[1]))
+        (m[1].match(/\.(mp4|avi|mkv|mov|webm|wmv)(\?|$)/i) ? c._webTasks.watch : c._webTasks.listen)
+          .push({name:(m[0]||"音视频").slice(0,30),url:m[1],duration:+m[2]||60});
+    });
+    delete c.webMedia;
+    state.config.web_earn={url:c.webUrl||"", media:c._webTasks.listen.concat(c._webTasks.watch)};
     msg("保存中…");
     try{
       if(window.__lanSync){        // 测试环境：保存到联调服务器（孩子端同款配置文件）

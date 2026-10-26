@@ -636,8 +636,24 @@ check("N9c 媒体进度已保留", "pos" in gu5._load_media_progress().get("med_
       gu5._load_media_progress().get("med_t9"))
 check("N9d 奖励会话仍保留可续", g.load_reward_session()[0] == "paused")
 gu5.start_reward_use()
+gu5.start_reward_use()
 gu5._end_reward_use()
 g.clear_reward_session()
+
+# N11: 网页版赚时间（CF Worker）结果入钱包（去重 + 单条上限 120 分钟）
+gu5.cfg["web_earn_url"] = "https://earn.example.workers.dev"
+fake_doc = {"results": [
+    {"id": "abc", "kind": "read", "name": "网页朗读课文", "minutes": 12},
+    {"id": "abc", "kind": "read", "name": "网页朗读课文", "minutes": 12},   # 重复 ID
+    {"id": "big", "kind": "listen", "name": "超长听力", "minutes": 999}]}   # 超上限
+g.save_ai_score({"results": {}, "rewards": []})
+gu5.ai_doc = g.load_ai_score()
+gu5._grant_web_earn(fake_doc)
+rw = g.load_ai_score().get("rewards", [])
+check("N11a 网页结果入钱包且重复去重", len([r for r in rw if str(r.get("task", "")).startswith("web-")]) == 2, rw)
+check("N11b 单条上限120分钟", all(r["minutes"] <= 120 for r in rw if str(r.get("task", "")).startswith("web-")), rw)
+gu5.apply_state(DATA(computer={"minutes": 30, "unlock": False, "required": []}))
+check("N11c 退回时间入钱包显示", any("🌐" in w["name"] for w in gu5.wallet), gu5.wallet)
 
 # N10: 暂停期间墙钟流逝不扣时间（本 bug 的核心回归：旧实现存时间点，暂停=照扣）
 gu5.enter_unlock(parent=False, reward=(60 * 60, ["r4"]))

@@ -829,6 +829,7 @@ class Guardian:
                                   "content": t.get("content")})
         self.local_media = self.local_scan.get("media") or []
         self._grant_local_rewards()
+        self._grant_web_earn()
         old_wallet_ids = [w["id"] for w in self.wallet]
         self.wallet = compute_wallet(data, self.spent)
         for r in (self.ai_doc.get("rewards") or []):     # 本地 AI 奖励合入钱包
@@ -1631,6 +1632,42 @@ class Guardian:
         except Exception as e:
             self.log.write("[media] 归档失败（进度标记仍会隐藏任务）%r" % e)
             return False
+
+    def _grant_web_earn(self, doc=None):
+        """网页版赚时间（CF Worker）结果 → 奖励入钱包（按结果 ID 去重，单条上限 120 分钟）。"""
+        we = self.cfg.get("web_earn") or {}
+        url = str(self.cfg.get("web_earn_url") or (we.get("url") if isinstance(we, dict) else "") or "").rstrip("/")
+        if not url:
+            return
+        if doc is None:
+            now = time.time()
+            if now < getattr(self, "_web_next_try", 0):
+                return                          # 拉取失败后的 60 秒退避
+            self._web_next_try = now + 60
+            try:
+                req = urllib.request.Request(url + "/api/results",
+                                             headers={"User-Agent": "PCGuardian"})
+                with urllib.request.urlopen(req, timeout=15) as r:
+                    doc = json.loads(r.read().decode("utf-8"))
+            except Exception as e:
+                self.log.write("[web] 成绩拉取失败 %r" % e)
+                return
+        granted = {r.get("task") for r in (self.ai_doc.get("rewards") or [])}
+        changed = False
+        for r in (doc.get("results") or []):
+            rid = "web-" + str(r.get("id") or "")
+            if not r.get("minutes") or rid in granted:
+                continue
+            m = min(120, max(1, int(r.get("minutes") or 0)))
+            self.ai_doc.setdefault("rewards", []).append({
+                "id": "ai-%s-%d" % (rid, int(time.time())), "task": rid,
+                "name": "🌐 " + str(r.get("name") or "网页任务"), "minutes": m,
+                "grantedAt": time.time()})
+            granted.add(rid)
+            changed = True
+            self.log.write("[web] 网页任务「%s」完成，发放 %d 分钟入钱包" % (r.get("name"), m))
+        if changed:
+            save_ai_score(self.ai_doc)
 
     def _media_dir(self):
         return str(self.cfg.get("media_dir") or os.path.join(script_dir(), "media"))
